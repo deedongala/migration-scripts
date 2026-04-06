@@ -677,7 +677,15 @@ const FALLBACK_CONFIG = {
     "do-atl1-vm-public": { label: "DigitalOcean ATL1", gpu: "MI300X/MI350" },
     "ccs-aus-bm-pvt-prd": { label: "CCS Austin (Prod)", gpu: "MI300X" },
     "vultr-ord-bm-public2": { label: "Vultr ORD (Infra)", gpu: "MI300X" },
-    "aks-saiscale-linux": { label: "AKS SAIScale (CPU)", gpu: "CPU" }
+    "aks-saiscale-linux": { label: "AKS SAIScale (CPU)", gpu: "CPU" },
+    "aks-win-runner-large": { label: "AKS Windows Runner", gpu: "CPU" },
+    "stg-vultr-mi325": { label: "Vultr MI325 (Staging)", gpu: "MI325X" },
+    "prod-conductor": { label: "Conductor (Prod)", gpu: "Infra" },
+    "prod-conductor-mi355": { label: "Conductor MI355", gpu: "MI355X" },
+    "prod-oci": { label: "OCI (Prod)", gpu: "Infra" },
+    "aws-usea1-eks-pvt-prd": { label: "AWS EKS (Prod)", gpu: "Infra" },
+    "aws-dev-usea1": { label: "AWS Dev", gpu: "Infra" },
+    "aws-stg-usea1": { label: "AWS Staging", gpu: "Infra" }
   },
   tenants: {
     rocm: { label: "ROCm", group: "AIG-TheRock-OSSCI-Infra", namespaces: ["arc-rocm"], clusters: { "prod-vultr-mi325": { runners: [{ key: "rocm-gfx942-1gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-1gpu-ossci-rocm" }] }, "ccs-aus-bm-pvt-prd": { runners: [{ key: "rocm-mi300-8gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-8gpu-ossci-rocm" }] } } },

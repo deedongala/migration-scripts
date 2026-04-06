@@ -5,7 +5,15 @@
     "do-atl1-vm-public": { "label": "DigitalOcean ATL1", "gpu": "MI300X/MI350", "alertClusterName": "DO_ATL1_VM_PUBLIC" },
     "ccs-aus-bm-pvt-prd": { "label": "CCS Austin (Prod)", "gpu": "MI300X", "alertClusterName": "CCS_AUS_BM_PVT_PRD" },
     "vultr-ord-bm-public2": { "label": "Vultr ORD (Infra)", "gpu": "MI300X", "alertClusterName": null },
-    "aks-saiscale-linux": { "label": "AKS SAIScale (CPU)", "gpu": "CPU", "alertClusterName": null }
+    "aks-saiscale-linux": { "label": "AKS SAIScale (CPU)", "gpu": "CPU", "alertClusterName": null },
+    "aks-win-runner-large": { "label": "AKS Windows Runner", "gpu": "CPU", "alertClusterName": null },
+    "stg-vultr-mi325": { "label": "Vultr MI325 (Staging)", "gpu": "MI325X", "alertClusterName": null },
+    "prod-conductor": { "label": "Conductor (Prod)", "gpu": "Infra", "alertClusterName": null },
+    "prod-conductor-mi355": { "label": "Conductor MI355", "gpu": "MI355X", "alertClusterName": null },
+    "prod-oci": { "label": "OCI (Prod)", "gpu": "Infra", "alertClusterName": null },
+    "aws-usea1-eks-pvt-prd": { "label": "AWS EKS (Prod)", "gpu": "Infra", "alertClusterName": null },
+    "aws-dev-usea1": { "label": "AWS Dev", "gpu": "Infra", "alertClusterName": null },
+    "aws-stg-usea1": { "label": "AWS Staging", "gpu": "Infra", "alertClusterName": null }
   },
   "tenants": {
     "rocm": {
