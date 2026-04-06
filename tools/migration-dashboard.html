@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI Runner Migration Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 24px; font-weight: 600; }
+  header .badge {
+    background: var(--accent);
+    color: var(--bg);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .setup-banner {
+    background: #1c2128;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .setup-banner input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+  }
+  .setup-banner input:focus { outline: none; border-color: var(--accent); }
+  .setup-banner label { color: var(--text-dim); font-size: 13px; white-space: nowrap; }
+  .setup-banner .repo-input { width: 280px; flex: none; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .step {
+    background: var(--accent);
+    color: var(--bg);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  select, input[type="text"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    appearance: none;
+  }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  select:focus, input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .checkbox-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .checkbox-group label { cursor: pointer; font-size: 14px; }
+
+  .tenant-info {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    display: none;
+  }
+  .tenant-info.visible { display: block; }
+  .tenant-info strong { color: var(--text); }
+
+  .summary {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: 20px;
+  }
+
+  .actions { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--green);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); }
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    border-color: var(--border);
+  }
+
+  .status {
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-top: 16px;
+    display: none;
+  }
+  .status.visible { display: flex; align-items: center; gap: 8px; }
+  .status.success { background: #0d2818; border: 1px solid #238636; color: var(--green); }
+  .status.error { background: #2d1215; border: 1px solid #f85149; color: var(--red); }
+  .status.info { background: #0c2d6b; border: 1px solid #1f6feb; color: var(--accent); }
+  .status.warning { background: #2e1e00; border: 1px solid #d29922; color: var(--yellow); }
+  .status a { color: inherit; text-decoration: underline; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .phase-flow {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .phase-pill {
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .phase-pill.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+  .phase-pill:hover:not(.active) { border-color: var(--text-dim); }
+  .phase-arrow { color: var(--text-dim); display: flex; align-items: center; font-size: 14px; }
+
+  .history { margin-top: 8px; }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .history-dot.success { background: var(--green); }
+  .history-dot.pending { background: var(--yellow); }
+  .history-dot.failed { background: var(--red); }
+  .history-dot.running { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>CI Runner Migration</h1>
+    <span class="badge">INTERNAL</span>
+  </header>
+
+  <div class="setup-banner">
+    <label>GitHub Token:</label>
+    <input type="password" id="ghToken" placeholder="ghp_..." oninput="saveToken()">
+    <label>Repo:</label>
+    <input type="text" id="ghRepo" class="repo-input" value="nod-ai/ossci-gitops" placeholder="owner/repo" oninput="saveRepo()">
+  </div>
+
+  <div class="card">
+    <h2><span class="step">1</span> Migration Phase</h2>
+    <div class="phase-flow">
+      <div class="phase-pill active" onclick="selectPhase('shadow')">Shadow</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-pill" onclick="selectPhase('drain')">Drain</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-pill" onclick="selectPhase('delete-source')">Delete Source</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-pill" onclick="selectPhase('promote')">Promote</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-pill" onclick="selectPhase('verify')">Verify</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span> Configuration</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Tenant</label>
+        <select id="tenant" onchange="onTenantChange()">
+          <option value="sglang">SGLang</option>
+          <option value="vllm">vLLM</option>
+          <option value="pytorch">PyTorch / ROCm</option>
+          <option value="hf">HuggingFace</option>
+          <option value="jax">JAX / XLA</option>
+          <option value="rad">RAD</option>
+          <option value="iree">IREE</option>
+          <option value="aims">AIMS</option>
+          <option value="aiter">AIter</option>
+          <option value="triton">Triton</option>
+          <option value="custom">Custom...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Source Cluster</label>
+        <select id="sourceCluster">
+          <option value="prod-vultr-mi325">prod-vultr-mi325</option>
+          <option value="tw-mia1-mi355-public">tw-mia1-mi355-public</option>
+          <option value="do-atl1-vm-public">do-atl1-vm-public</option>
+          <option value="ccs-aus-bm-pvt-prd">ccs-aus-bm-pvt-prd</option>
+          <option value="vultr-ord-bm-public2">vultr-ord-bm-public2</option>
+          <option value="aks-saiscale-linux">aks-saiscale-linux</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Destination Cluster</label>
+        <select id="destCluster">
+          <option value="tw-mia1-mi355-public">tw-mia1-mi355-public</option>
+          <option value="prod-vultr-mi325">prod-vultr-mi325</option>
+          <option value="do-atl1-vm-public">do-atl1-vm-public</option>
+          <option value="ccs-aus-bm-pvt-prd">ccs-aus-bm-pvt-prd</option>
+          <option value="vultr-ord-bm-public2">vultr-ord-bm-public2</option>
+          <option value="aks-saiscale-linux">aks-saiscale-linux</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Namespaces</label>
+        <input type="text" id="namespaces" value="all" placeholder="all or comma-separated">
+      </div>
+      <div class="form-group">
+        <label>Max Runners Override</label>
+        <input type="text" id="maxRunners" placeholder="e.g. runner-key=48">
+      </div>
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="includeRbac" checked>
+          <label for="includeRbac">Include RBAC</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="dryRun">
+          <label for="dryRun">Dry-run (preview only)</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="tenant-info" id="tenantInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span> Review & Execute</h2>
+    <div class="summary" id="summary"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="runBtn" onclick="triggerMigration()">Run Migration</button>
+      <button class="btn btn-secondary" onclick="triggerMigration(true)">Dry Run</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent Runs</h2>
+    <div class="history" id="history">
+      <div style="color: var(--text-dim); font-size: 13px; padding: 12px 0;">
+        Click "Load Runs" to fetch recent workflow runs.
+      </div>
+    </div>
+    <div style="margin-top: 12px;">
+      <button class="btn btn-secondary" onclick="loadRuns()">Load Runs</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TENANT_DATA = {
+  sglang:  { group: 'sglang_ci_runner',       ns: 'arc-sglang',       clusters: 'prod-vultr-mi325, tw-mia1-mi355-public' },
+  vllm:    { group: 'frameworks-devops',       ns: 'arc-vllm',         clusters: 'prod-vultr-mi325, tw-mia1-mi355-public' },
+  pytorch: { group: 'AIG-TheRock-OSSCI-Infra', ns: 'arc-rocm, arc-meta-pytorch, arc-pytorch-mi325-gpu-1, arc-pytorch-mi325-gpu-2, arc-pytorch-mi325-gpu-4, arc-pytorch-mi325-gpu-8', clusters: 'prod-vultr-mi325, ccs-aus-bm-pvt-prd' },
+  hf:      { group: 'dl-automation',           ns: 'arc-hf',           clusters: 'prod-vultr-mi325' },
+  jax:     { group: 'dl.sec-JAX',              ns: 'arc-jax, arc-rocm-jax, arc-xla, jax-framework-dev', clusters: 'do-atl1-vm-public' },
+  rad:     { group: 'dsg.RAD_CI',              ns: 'arc-rad',          clusters: 'do-atl1-vm-public' },
+  iree:    { group: 'iree-dev',                ns: 'iree-dev, arc-iree-mi325-gpu-1, arc-iree-mi325-gpu-2', clusters: 'tw-mia1-mi355-public, prod-vultr-mi325' },
+  aims:    { group: 'aimsdevgroup',            ns: 'aims-dev',         clusters: 'prod-vultr-mi325' },
+  aiter:   { group: '',                        ns: 'arc-aiter',        clusters: 'prod-vultr-mi325' },
+  triton:  { group: '',                        ns: 'arc-triton-gpu-1, arc-triton-distributed-gpu-8', clusters: 'prod-vultr-mi325' },
+};
+
+let selectedPhase = 'shadow';
+
+function selectPhase(phase) {
+  selectedPhase = phase;
+  document.querySelectorAll('.phase-pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  updateSummary();
+}
+
+function onTenantChange() {
+  const tenant = document.getElementById('tenant').value;
+  const info = document.getElementById('tenantInfo');
+  const data = TENANT_DATA[tenant];
+  if (data) {
+    info.innerHTML = `<strong>AD Group:</strong> ${data.group || 'none'} &nbsp; <strong>Namespaces:</strong> ${data.ns} &nbsp; <strong>Current Clusters:</strong> ${data.clusters}`;
+    info.classList.add('visible');
+    document.getElementById('namespaces').value = data.ns.replace(/, /g, ',');
+  } else {
+    info.classList.remove('visible');
+  }
+  updateSummary();
+}
+
+function updateSummary() {
+  const s = document.getElementById('summary');
+  const tenant = document.getElementById('tenant').value;
+  const src = document.getElementById('sourceCluster').value;
+  const dest = document.getElementById('destCluster').value;
+  const ns = document.getElementById('namespaces').value || 'all';
+  const maxR = document.getElementById('maxRunners').value || 'none';
+  const rbac = document.getElementById('includeRbac').checked ? 'Yes' : 'No';
+  const dry = document.getElementById('dryRun').checked ? 'Yes' : 'No';
+  const group = TENANT_DATA[tenant]?.group || 'none';
+
+  s.textContent =
+`Phase:        ${selectedPhase}
+Tenant:       ${tenant}
+AD Group:     ${group}
+Source:        ${src}
+Destination:  ${dest}
+Namespaces:   ${ns}
+Max Runners:  ${maxR}
+RBAC:         ${rbac}
+Dry-run:      ${dry}`;
+}
+
+function showStatus(type, msg) {
+  const s = document.getElementById('status');
+  s.className = `status visible ${type}`;
+  s.innerHTML = msg;
+}
+
+async function triggerMigration(forceDry = false) {
+  const token = document.getElementById('ghToken').value;
+  const repo = document.getElementById('ghRepo').value;
+  if (!token) { showStatus('error', 'GitHub token required'); return; }
+  if (!repo) { showStatus('error', 'Repository required'); return; }
+
+  const src = document.getElementById('sourceCluster').value;
+  const dest = document.getElementById('destCluster').value;
+  if (src === dest) { showStatus('error', 'Source and destination cannot be the same cluster'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  showStatus('info', '<span class="spinner"></span> Triggering workflow...');
+
+  const inputs = {
+    tenant: document.getElementById('tenant').value,
+    phase: selectedPhase,
+    source_cluster: src,
+    destination_cluster: dest,
+    namespaces: document.getElementById('namespaces').value || 'all',
+    max_runners: document.getElementById('maxRunners').value || '',
+    include_rbac: document.getElementById('includeRbac').checked ? 'true' : 'false',
+    dry_run: (forceDry || document.getElementById('dryRun').checked) ? 'true' : 'false',
+  };
+
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/migrate-runners.yaml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'staging', inputs }),
+    });
+
+    if (resp.status === 204) {
+      showStatus('success', `Workflow triggered! <a href="https://github.com/${repo}/actions/workflows/migrate-runners.yaml" target="_blank">View in GitHub Actions &rarr;</a>`);
+      saveHistory(inputs);
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      showStatus('error', `Failed (${resp.status}): ${err.message || 'Unknown error'}`);
+    }
+  } catch (e) {
+    showStatus('error', `Network error: ${e.message}`);
+  }
+  btn.disabled = false;
+}
+
+async function loadRuns() {
+  const token = document.getElementById('ghToken').value;
+  const repo = document.getElementById('ghRepo').value;
+  if (!token || !repo) { showStatus('error', 'Token and repo required'); return; }
+
+  const hist = document.getElementById('history');
+  hist.innerHTML = '<div style="color: var(--text-dim); padding: 8px 0;"><span class="spinner"></span> Loading...</div>';
+
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/migrate-runners.yaml/runs?per_page=10`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+    });
+    const data = await resp.json();
+
+    if (!data.workflow_runs || data.workflow_runs.length === 0) {
+      hist.innerHTML = '<div style="color: var(--text-dim); padding: 8px 0;">No runs found.</div>';
+      return;
+    }
+
+    hist.innerHTML = data.workflow_runs.map(run => {
+      const statusMap = { completed: 'success', in_progress: 'running', queued: 'pending', failure: 'failed' };
+      const dotClass = run.conclusion === 'failure' ? 'failed' : (statusMap[run.status] || 'pending');
+      const time = new Date(run.created_at).toLocaleString();
+      return `<div class="history-item">
+        <span class="history-dot ${dotClass}"></span>
+        <span style="flex:1"><a href="${run.html_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${run.display_title || run.name}</a></span>
+        <span style="color: var(--text-dim); font-size: 12px;">${time}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    hist.innerHTML = `<div style="color: var(--red); padding: 8px 0;">Error: ${e.message}</div>`;
+  }
+}
+
+function saveHistory(inputs) {
+  const runs = JSON.parse(localStorage.getItem('migration_runs') || '[]');
+  runs.unshift({ ...inputs, timestamp: new Date().toISOString() });
+  if (runs.length > 20) runs.pop();
+  localStorage.setItem('migration_runs', JSON.stringify(runs));
+}
+
+function saveToken() {
+  localStorage.setItem('gh_token', document.getElementById('ghToken').value);
+}
+function saveRepo() {
+  localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const savedToken = localStorage.getItem('gh_token');
+  const savedRepo = localStorage.getItem('gh_repo');
+  if (savedToken) document.getElementById('ghToken').value = savedToken;
+  if (savedRepo) document.getElementById('ghRepo').value = savedRepo;
+
+  document.querySelectorAll('select, input').forEach(el => {
+    el.addEventListener('change', updateSummary);
+    el.addEventListener('input', updateSummary);
+  });
+
+  onTenantChange();
+  updateSummary();
+});
+</script>
+</body>
+</html>
