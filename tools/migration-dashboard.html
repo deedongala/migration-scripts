@@ -429,9 +429,17 @@
 <div class="container">
 
   <header>
-    <h1>CI Runner Migration</h1>
+    <h1 id="pageTitle">CI Runner Migration</h1>
     <span class="badge">INTERNAL</span>
   </header>
+
+  <div class="card" style="padding: 12px 20px;">
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="color: var(--text-dim); font-size: 13px; margin-right: 8px;">Mode:</span>
+      <div class="phase-pill active" id="modeMigration" onclick="selectMode('migration')">Migration</div>
+      <div class="phase-pill" id="modeOnboarding" onclick="selectMode('onboarding')">Onboarding</div>
+    </div>
+  </div>
 
   <div class="setup-banner">
     <label>GitHub Token:</label>
@@ -617,19 +625,97 @@
 </div>
 
 <script>
-const TENANT_DATA = {
-  sglang:  { label: 'SGLang',         group: 'sglang_ci_runner',       ns: 'arc-sglang',       clusters: 'prod-vultr-mi325, tw-mia1-mi355-public', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-sglang', 'tw-mia1-mi355-public': 'linux-mi355-1gpu-sglang' } },
-  vllm:    { label: 'vLLM',           group: 'frameworks-devops',       ns: 'arc-vllm',         clusters: 'prod-vultr-mi325, tw-mia1-mi355-public', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-vllm', 'tw-mia1-mi355-public': 'linux-mi355-1gpu-vllm' } },
-  rocm:    { label: 'ROCm',            group: 'AIG-TheRock-OSSCI-Infra', ns: 'arc-rocm',         clusters: 'prod-vultr-mi325, ccs-aus-bm-pvt-prd', runLabels: { 'prod-vultr-mi325': 'linux-gfx942-1gpu-ossci-rocm', 'ccs-aus-bm-pvt-prd': 'linux-gfx942-1gpu-ccs-ossci-rocm' } },
-  pytorch: { label: 'PyTorch',         group: '',                        ns: 'arc-meta-pytorch,arc-pytorch-mi325-gpu-1,arc-pytorch-mi325-gpu-2,arc-pytorch-mi325-gpu-4,arc-pytorch-mi325-gpu-8,arc-pytorch', clusters: 'prod-vultr-mi325, do-atl1-vm-public', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-pytorch', 'do-atl1-vm-public': 'linux.rocm.gpu.ecosystem.gfx950.1' } },
-  hf:      { label: 'HuggingFace',    group: 'dl-automation',           ns: 'arc-hf',           clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-hf' } },
-  jax:     { label: 'JAX / XLA',      group: 'dl.sec-JAX',              ns: 'arc-jax,arc-rocm-jax,arc-xla,jax-framework-dev', clusters: 'do-atl1-vm-public', runLabels: { 'do-atl1-vm-public': 'linux-mi300-jax' } },
-  rad:     { label: 'RAD',            group: 'dsg.RAD_CI',              ns: 'arc-rad',          clusters: 'do-atl1-vm-public', runLabels: { 'do-atl1-vm-public': 'linux-mi300-rad' } },
-  iree:    { label: 'IREE',           group: 'iree-dev',                ns: 'iree-dev,arc-iree-mi325-gpu-1,arc-iree-mi325-gpu-2', clusters: 'tw-mia1-mi355-public, prod-vultr-mi325', runLabels: { 'tw-mia1-mi355-public': 'linux-mi355-iree', 'prod-vultr-mi325': 'linux-mi325-1gpu-iree' } },
-  aims:    { label: 'AIMS',           group: 'aimsdevgroup',            ns: 'aims-dev',         clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-aims' } },
-  aiter:   { label: 'AIter',          group: '',                        ns: 'arc-aiter',        clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-aiter' } },
-  triton:  { label: 'Triton',         group: '',                        ns: 'arc-triton-gpu-1,arc-triton-distributed-gpu-8', clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-triton' } },
+let TENANT_DATA = {};
+let CLUSTER_DATA = {};
+let CONFIG_LOADED = false;
+
+function convertConfig(config) {
+  CLUSTER_DATA = config.clusters || {};
+  const td = {};
+  for (const [key, t] of Object.entries(config.tenants || {})) {
+    const clusterNames = Object.keys(t.clusters || {});
+    const runLabels = {};
+    for (const [c, cData] of Object.entries(t.clusters || {})) {
+      const runners = cData.runners || [];
+      if (runners.length > 0) {
+        runLabels[c] = runners[0].label;
+      }
+    }
+    td[key] = {
+      label: t.label,
+      group: t.group || '',
+      ns: (t.namespaces || []).join(','),
+      clusters: clusterNames.join(', '),
+      runLabels,
+      allRunners: t.clusters || {},
+    };
+  }
+  TENANT_DATA = td;
+  CONFIG_LOADED = true;
+}
+
+function populateClusterDropdowns() {
+  const clusters = Object.keys(CLUSTER_DATA);
+  if (clusters.length === 0) return;
+  ['sourceCluster', 'destCluster'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '';
+    clusters.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}${CLUSTER_DATA[c]?.gpu ? ' (' + CLUSTER_DATA[c].gpu + ')' : ''}`;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+// Embedded fallback config (auto-generated from tenants.json)
+const FALLBACK_CONFIG = {
+  clusters: {
+    "prod-vultr-mi325": { label: "Vultr MI325 (Prod)", gpu: "MI325X" },
+    "tw-mia1-mi355-public": { label: "TW MIA1 MI355", gpu: "MI355X" },
+    "do-atl1-vm-public": { label: "DigitalOcean ATL1", gpu: "MI300X/MI350" },
+    "ccs-aus-bm-pvt-prd": { label: "CCS Austin (Prod)", gpu: "MI300X" },
+    "vultr-ord-bm-public2": { label: "Vultr ORD (Infra)", gpu: "MI300X" },
+    "aks-saiscale-linux": { label: "AKS SAIScale (CPU)", gpu: "CPU" }
+  },
+  tenants: {
+    rocm: { label: "ROCm", group: "AIG-TheRock-OSSCI-Infra", namespaces: ["arc-rocm"], clusters: { "prod-vultr-mi325": { runners: [{ key: "rocm-gfx942-1gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-1gpu-ossci-rocm" }] }, "ccs-aus-bm-pvt-prd": { runners: [{ key: "rocm-mi300-8gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-8gpu-ossci-rocm" }] } } },
+    pytorch: { label: "PyTorch", group: "", namespaces: ["arc-meta-pytorch","arc-pytorch","arc-pytorch-mi325-gpu-1","arc-pytorch-mi325-gpu-2","arc-pytorch-mi325-gpu-4","arc-pytorch-mi325-gpu-8"], clusters: { "prod-vultr-mi325": { runners: [{ key: "pytorch-mi325-1gpu-runner", namespace: "arc-pytorch-mi325-gpu-1", label: "linux.rocm.gpu.gfx942.1" }] }, "do-atl1-vm-public": { runners: [{ key: "pytorch-mi325-1gpu-runner-no-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.1" }] } } },
+    sglang: { label: "SGLang", group: "sglang_ci_runner", namespaces: ["arc-sglang"], clusters: { "prod-vultr-mi325": { runners: [{ key: "sglang-mi325-1gpu-runner", namespace: "arc-sglang", label: "linux-mi325-1gpu-sglang" }] }, "tw-mia1-mi355-public": { runners: [{ key: "sglang-mi35x-1gpu-runner", namespace: "arc-sglang", label: "linux-mi35x-gpu-1" }] } } },
+    vllm: { label: "vLLM", group: "frameworks-devops", namespaces: ["arc-vllm","buildkite-vllm"], clusters: { "prod-vultr-mi325": { runners: [] }, "tw-mia1-mi355-public": { runners: [] } } },
+    hf: { label: "HuggingFace", group: "dl-automation", namespaces: ["arc-hf"], clusters: { "prod-vultr-mi325": { runners: [{ key: "huggingface-mi325-1gpu-runner", namespace: "arc-hf", label: "amd-mi325-ci-1gpu" }] } } },
+    jax: { label: "JAX / XLA", group: "dl.sec-JAX", namespaces: ["arc-jax","arc-rocm-jax","arc-xla","jax-framework-dev"], clusters: { "do-atl1-vm-public": { runners: [{ key: "jax-mi325-1gpu-runner", namespace: "arc-jax", label: "linux-x86-64-1gpu-amd" }] } } },
+    rad: { label: "RAD", group: "dsg.RAD_CI", namespaces: ["arc-rad"], clusters: { "do-atl1-vm-public": { runners: [{ key: "rad-mi325-8gpu-runner", namespace: "arc-rad", label: "linux-mi325-8gpu-ossci-rad" }] } } },
+    iree: { label: "IREE", group: "iree-dev", namespaces: ["iree-dev","arc-iree-mi325-gpu-1","arc-iree-mi325-gpu-2","arc-iree"], clusters: { "prod-vultr-mi325": { runners: [{ key: "iree-mi325-1gpu-runner", namespace: "arc-iree-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-iree-org" }] }, "do-atl1-vm-public": { runners: [{ key: "iree-mi35x-1gpu-runner", namespace: "arc-iree", label: "linux-mi35x-1gpu-ossci-iree-org" }] } } },
+    aims: { label: "AIMS", group: "aimsdevgroup", namespaces: ["aims-dev"], clusters: { "prod-vultr-mi325": { runners: [] } } },
+    aiter: { label: "AIter", group: "", namespaces: ["arc-aiter"], clusters: { "prod-vultr-mi325": { runners: [{ key: "aiter-1gpu-runner", namespace: "arc-aiter", label: "aiter-1gpu-runner" }] } } },
+    triton: { label: "Triton", group: "", namespaces: ["arc-triton-gpu-1","arc-triton-distributed-gpu-8","arc-triton"], clusters: { "prod-vultr-mi325": { runners: [{ key: "triton-mi325-1gpu-runner", namespace: "arc-triton-gpu-1", label: "amd-gfx942" }] }, "tw-mia1-mi355-public": { runners: [{ key: "triton-mi355-1gpu-runner", namespace: "arc-triton", label: "amd-gfx950" }] } } },
+    "nod-ai": { label: "Nod AI", group: "", namespaces: ["arc-nod-ai-mi325-gpu-1","arc-nod-ai-mi325-gpu-2","arc-nod-ai-mi325-gpu-8","arc-nod-ai"], clusters: { "prod-vultr-mi325": { runners: [{ key: "nod-ai-mi325-1gpu-runner", namespace: "arc-nod-ai-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-nod-ai" }] }, "do-atl1-vm-public": { runners: [{ key: "nod-ai-mi355-1gpu-runner", namespace: "arc-nod-ai", label: "linux-mi355-1gpu-ossci-nod-ai" }] } } },
+    llvm: { label: "LLVM", group: "", namespaces: ["arc-llvm"], clusters: { "prod-vultr-mi325": { runners: [{ key: "llvm-mi325-2gpu-runner", namespace: "arc-llvm", label: "arc-llvm-ci-2gpu" }] } } },
+  }
 };
+
+async function loadConfig() {
+  try {
+    const resp = await fetch('config/tenants.json');
+    if (resp.ok) {
+      const config = await resp.json();
+      convertConfig(config);
+      console.log('Loaded config from tenants.json');
+    } else {
+      throw new Error('fetch failed');
+    }
+  } catch (e) {
+    console.log('Using fallback config (tenants.json not found)');
+    convertConfig(FALLBACK_CONFIG);
+  }
+  populateClusterDropdowns();
+  renderTenantGrid();
+  renderClusterMap();
+  renderRunnerLabels();
+  updateSummary();
+}
 
 let selectedPhase = 'shadow';
 let selectedTenants = new Set();
@@ -1035,13 +1121,25 @@ function renderRunnerLabels() {
   const body = document.getElementById('runnerLabelsBody');
   const rows = [];
   Object.entries(TENANT_DATA).forEach(([key, d]) => {
-    Object.entries(d.runLabels || {}).forEach(([cluster, label]) => {
-      rows.push(`<tr>
-        <td><strong>${d.label}</strong></td>
-        <td style="font-size:12px;">${cluster}</td>
-        <td><span class="label-tag">${label}</span></td>
-      </tr>`);
+    const allRunners = d.allRunners || {};
+    Object.entries(allRunners).forEach(([cluster, cData]) => {
+      (cData.runners || []).forEach(r => {
+        rows.push(`<tr>
+          <td><strong>${d.label}</strong></td>
+          <td style="font-size:12px;">${cluster}</td>
+          <td><span class="label-tag">${r.label}</span></td>
+        </tr>`);
+      });
     });
+    if (Object.keys(allRunners).length === 0) {
+      Object.entries(d.runLabels || {}).forEach(([cluster, label]) => {
+        rows.push(`<tr>
+          <td><strong>${d.label}</strong></td>
+          <td style="font-size:12px;">${cluster}</td>
+          <td><span class="label-tag">${label}</span></td>
+        </tr>`);
+      });
+    }
   });
   body.innerHTML = rows.join('');
 }
@@ -1224,10 +1322,7 @@ window.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', updateSummary);
   });
 
-  renderTenantGrid();
-  renderClusterMap();
-  renderRunnerLabels();
-  updateSummary();
+  loadConfig();
   saveRepo();
 });
 </script>
