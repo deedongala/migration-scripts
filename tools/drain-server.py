@@ -17,21 +17,51 @@ import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
+KNOWN_NAMESPACES = [
+    "arc", "arc-rocm", "arc-meta-pytorch", "arc-pytorch",
+    "arc-pytorch-mi325-gpu-1", "arc-pytorch-mi325-gpu-2",
+    "arc-pytorch-mi325-gpu-4", "arc-pytorch-mi325-gpu-8",
+    "arc-sglang", "arc-vllm", "buildkite-vllm",
+    "arc-hf", "arc-jax", "arc-rocm-jax", "arc-xla", "jax-framework-dev",
+    "arc-rad", "arc-iree-mi325-gpu-1", "arc-iree-mi325-gpu-2", "iree-dev",
+    "arc-aiter", "arc-triton-gpu-1", "arc-triton-distributed-gpu-8",
+    "aims-dev", "arc-ossci-gitops",
+]
+
+
 def get_namespaces(context_args):
-    """Get all arc-* and tenant namespaces."""
+    """Try dynamic discovery first, fall back to known namespaces."""
     cmd = ["kubectl"] + context_args + [
         "get", "namespaces", "-o", "jsonpath={.items[*].metadata.name}"
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-    if result.returncode != 0:
-        return []
-    all_ns = result.stdout.strip().split()
-    return [
-        ns for ns in all_ns
-        if ns.startswith("arc-") or ns in (
-            "iree-dev", "aims-dev", "buildkite-vllm", "jax-framework-dev"
-        )
-    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        if result.returncode == 0 and result.stdout.strip():
+            all_ns = result.stdout.strip().split()
+            filtered = [
+                ns for ns in all_ns
+                if ns.startswith("arc-") or ns in (
+                    "iree-dev", "aims-dev", "buildkite-vllm", "jax-framework-dev"
+                )
+            ]
+            if filtered:
+                return filtered
+    except Exception:
+        pass
+
+    # Fall back: probe known namespaces to see which ones exist
+    valid = []
+    for ns in KNOWN_NAMESPACES:
+        probe = ["kubectl"] + context_args + [
+            "get", "pods", "-n", ns, "--no-headers", "--field-selector=status.phase!=Failed"
+        ]
+        try:
+            r = subprocess.run(probe, capture_output=True, text=True, timeout=5)
+            if r.returncode == 0:
+                valid.append(ns)
+        except Exception:
+            pass
+    return valid
 
 
 def get_pod_counts(context_args, namespaces):
