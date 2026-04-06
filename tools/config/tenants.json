@@ -37,16 +37,14 @@
     "pytorch": {
       "label": "PyTorch",
       "group": "",
-      "namespaces": ["arc-meta-pytorch", "arc-pytorch", "arc-pytorch-mi325-gpu-1", "arc-pytorch-mi325-gpu-2", "arc-pytorch-mi325-gpu-4", "arc-pytorch-mi325-gpu-8"],
+      "namespaces": ["arc-pytorch", "arc-pytorch-mi325-gpu-1", "arc-pytorch-mi325-gpu-2", "arc-pytorch-mi325-gpu-4", "arc-pytorch-mi325-gpu-8"],
       "clusters": {
         "prod-vultr-mi325": {
           "runners": [
             { "key": "pytorch-mi325-1gpu-runner", "namespace": "arc-pytorch-mi325-gpu-1", "label": "linux.rocm.gpu.gfx942.1" },
             { "key": "pytorch-mi325-2gpu-runner", "namespace": "arc-pytorch-mi325-gpu-2", "label": "linux.rocm.gpu.gfx942.2" },
             { "key": "pytorch-mi325-4gpu-runner", "namespace": "arc-pytorch-mi325-gpu-4", "label": "linux.rocm.gpu.gfx942.4" },
-            { "key": "pytorch-mi325-8gpu-runner", "namespace": "arc-pytorch-mi325-gpu-8", "label": "linux.rocm.gpu.gfx942.8" },
-            { "key": "meta-pytorch-mi325-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.1.meta-pytorch" },
-            { "key": "meta-pytorch-mi325-8gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.8.meta-pytorch" }
+            { "key": "pytorch-mi325-8gpu-runner", "namespace": "arc-pytorch-mi325-gpu-8", "label": "linux.rocm.gpu.gfx942.8" }
           ]
         },
         "do-atl1-vm-public": {
@@ -55,6 +53,19 @@
             { "key": "pytorch-mi350-2gpu-runner", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.2" },
             { "key": "pytorch-mi325-4gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.4" },
             { "key": "pytorch-mi325-8gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.8" }
+          ]
+        }
+      }
+    },
+    "meta-pytorch": {
+      "label": "Meta PyTorch",
+      "group": "",
+      "namespaces": ["arc-meta-pytorch"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "meta-pytorch-mi325-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.1.meta-pytorch" },
+            { "key": "meta-pytorch-mi325-8gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.8.meta-pytorch" }
           ]
         },
         "tw-mia1-mi355-public": {
