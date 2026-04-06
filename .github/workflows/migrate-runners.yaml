@@ -1,0 +1,549 @@
+name: Migrate ARC Runners
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: "Tenant to migrate"
+        required: true
+        type: choice
+        options:
+          - sglang
+          - vllm
+          - pytorch
+          - hf
+          - jax
+          - rad
+          - iree
+          - aims
+          - aiter
+          - triton
+          - custom
+      phase:
+        description: "Migration phase"
+        required: true
+        type: choice
+        options:
+          - shadow
+          - drain
+          - delete-source
+          - promote
+          - verify
+      source_cluster:
+        description: "Source cluster"
+        required: true
+        type: choice
+        options:
+          - prod-vultr-mi325
+          - tw-mia1-mi355-public
+          - do-atl1-vm-public
+          - ccs-aus-bm-pvt-prd
+          - vultr-ord-bm-public2
+          - aks-saiscale-linux
+      destination_cluster:
+        description: "Destination cluster"
+        required: true
+        type: choice
+        options:
+          - prod-vultr-mi325
+          - tw-mia1-mi355-public
+          - do-atl1-vm-public
+          - ccs-aus-bm-pvt-prd
+          - vultr-ord-bm-public2
+          - aks-saiscale-linux
+      namespaces:
+        description: "Comma-separated namespaces (leave 'all' to auto-detect from tenant)"
+        required: false
+        type: string
+        default: "all"
+      max_runners:
+        description: "Override maxRunners (blank = keep current). Format: runner-key=count,runner-key=count"
+        required: false
+        type: string
+        default: ""
+      include_rbac:
+        description: "Create RBAC manifests (RoleBinding + ClusterRoleBinding)"
+        required: false
+        type: boolean
+        default: true
+      dry_run:
+        description: "Dry-run mode (preview only, no file changes)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: migrate-runners-${{ github.event.inputs.source_cluster }}-${{ github.event.inputs.destination_cluster }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: "Migrate Runners (${{ github.event.inputs.phase }})"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
+
+      - name: Resolve tenant to namespaces
+        id: resolve
+        run: |
+          TENANT="${{ github.event.inputs.tenant }}"
+          NS_INPUT="${{ github.event.inputs.namespaces }}"
+
+          # Tenant → namespace mapping
+          declare -A TENANT_NS_MAP
+          TENANT_NS_MAP[sglang]="arc-sglang"
+          TENANT_NS_MAP[vllm]="arc-vllm"
+          TENANT_NS_MAP[pytorch]="arc-rocm,arc-meta-pytorch,arc-pytorch-mi325-gpu-1,arc-pytorch-mi325-gpu-2,arc-pytorch-mi325-gpu-4,arc-pytorch-mi325-gpu-8"
+          TENANT_NS_MAP[hf]="arc-hf"
+          TENANT_NS_MAP[jax]="arc-jax,arc-rocm-jax,arc-xla,jax-framework-dev"
+          TENANT_NS_MAP[rad]="arc-rad"
+          TENANT_NS_MAP[iree]="iree-dev,arc-iree-mi325-gpu-1,arc-iree-mi325-gpu-2"
+          TENANT_NS_MAP[aims]="aims-dev"
+          TENANT_NS_MAP[aiter]="arc-aiter"
+          TENANT_NS_MAP[triton]="arc-triton-gpu-1,arc-triton-distributed-gpu-8"
+
+          # Tenant → AD security group mapping
+          declare -A TENANT_GROUP_MAP
+          TENANT_GROUP_MAP[sglang]="sglang_ci_runner"
+          TENANT_GROUP_MAP[vllm]="frameworks-devops"
+          TENANT_GROUP_MAP[pytorch]="AIG-TheRock-OSSCI-Infra"
+          TENANT_GROUP_MAP[hf]="dl-automation"
+          TENANT_GROUP_MAP[jax]="dl.sec-JAX"
+          TENANT_GROUP_MAP[rad]="dsg.RAD_CI"
+          TENANT_GROUP_MAP[iree]="iree-dev"
+          TENANT_GROUP_MAP[aims]="aimsdevgroup"
+
+          if [[ "$NS_INPUT" == "all" && "$TENANT" != "custom" ]]; then
+            NAMESPACES="${TENANT_NS_MAP[$TENANT]:-all}"
+          else
+            NAMESPACES="$NS_INPUT"
+          fi
+
+          AD_GROUP="${TENANT_GROUP_MAP[$TENANT]:-}"
+
+          echo "namespaces=$NAMESPACES" >> "$GITHUB_OUTPUT"
+          echo "ad_group=$AD_GROUP" >> "$GITHUB_OUTPUT"
+          echo "tenant=$TENANT" >> "$GITHUB_OUTPUT"
+
+          echo "### Resolved Configuration" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tenant | \`$TENANT\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Namespaces | \`$NAMESPACES\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| AD Group | \`$AD_GROUP\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Phase | \`${{ github.event.inputs.phase }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source | \`${{ github.event.inputs.source_cluster }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Destination | \`${{ github.event.inputs.destination_cluster }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate inputs
+        run: |
+          SRC="${{ github.event.inputs.source_cluster }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          if [[ "$SRC" == "$DEST" ]]; then
+            echo "::error::Source and destination clusters cannot be the same"
+            exit 1
+          fi
+          if [[ ! -d "clusters/$SRC" ]]; then
+            echo "::error::Source cluster directory not found: clusters/$SRC"
+            exit 1
+          fi
+          if [[ ! -d "clusters/$DEST" ]]; then
+            echo "::error::Destination cluster directory not found: clusters/$DEST"
+            exit 1
+          fi
+
+      - name: Determine branch names
+        id: branches
+        run: |
+          SRC="${{ github.event.inputs.source_cluster }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          PHASE="${{ github.event.inputs.phase }}"
+          TENANT="${{ steps.resolve.outputs.tenant }}"
+
+          case "$PHASE" in
+            shadow)
+              BRANCH="dev/migrate-${TENANT}-to-${DEST}"
+              BASE="staging"
+              ;;
+            drain)
+              BRANCH="dev/migrate-${TENANT}-drain-${SRC}"
+              BASE="staging"
+              ;;
+            delete-source)
+              BRANCH="dev/migrate-${TENANT}-delete-${SRC}"
+              BASE="staging"
+              ;;
+            promote)
+              BRANCH="dev/migrate-${TENANT}-to-${DEST}"
+              BASE="staging"
+              ;;
+            verify)
+              BRANCH=""
+              BASE="main"
+              ;;
+          esac
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branches.outputs.base }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "ossci-gitops-automation[bot]"
+          git config user.email "ossci-gitops-automation[bot]@users.noreply.github.com"
+
+      - name: Create or checkout branch
+        if: github.event.inputs.phase != 'verify'
+        run: |
+          BRANCH="${{ steps.branches.outputs.branch }}"
+          PHASE="${{ github.event.inputs.phase }}"
+
+          if git ls-remote --exit-code --heads origin "$BRANCH" &>/dev/null; then
+            echo "Branch $BRANCH exists, checking it out"
+            git checkout -b "$BRANCH" "origin/$BRANCH"
+          else
+            echo "Creating new branch $BRANCH"
+            git checkout -b "$BRANCH"
+          fi
+
+      - name: Install yq
+        run: |
+          wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x yq_linux_amd64
+          sudo mv yq_linux_amd64 /usr/local/bin/yq
+
+      - name: Run migration script
+        id: migrate
+        run: |
+          DRY_RUN_FLAG=""
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          bash scripts/arc-runner-migration/migrate-runners.sh \
+            --phase "${{ github.event.inputs.phase }}" \
+            --source "${{ github.event.inputs.source_cluster }}" \
+            --dest "${{ github.event.inputs.destination_cluster }}" \
+            --namespaces "${{ steps.resolve.outputs.namespaces }}" \
+            $DRY_RUN_FLAG
+
+      - name: Create RBAC manifests
+        if: >-
+          github.event.inputs.include_rbac == 'true' &&
+          github.event.inputs.phase == 'shadow' &&
+          github.event.inputs.dry_run != 'true'
+        run: |
+          AD_GROUP="${{ steps.resolve.outputs.ad_group }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          NAMESPACES="${{ steps.resolve.outputs.namespaces }}"
+
+          if [[ -z "$AD_GROUP" ]]; then
+            echo "No AD group configured for this tenant, skipping RBAC"
+            exit 0
+          fi
+
+          IFS=',' read -ra NS_ARRAY <<< "$NAMESPACES"
+          for NS in "${NS_ARRAY[@]}"; do
+            NS_DIR="clusters/$DEST/namespaces/$NS"
+            mkdir -p "$NS_DIR"
+
+            # RoleBinding - namespace viewer
+            RB_FILE="$NS_DIR/rb-viewer-${AD_GROUP}.yaml"
+            if [[ ! -f "$RB_FILE" ]]; then
+              cat > "$RB_FILE" <<EOF
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: viewer-${AD_GROUP}
+            namespace: ${NS}
+            annotations:
+              argocd.argoproj.io/sync-wave: "0"
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: namespace-viewer
+          subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: Group
+            name: ${AD_GROUP}
+          EOF
+              echo "Created RoleBinding: $RB_FILE"
+            fi
+
+            # ClusterRoleBinding - cluster tenant
+            CRB_FILE="$NS_DIR/crb-tenant-${AD_GROUP}.yaml"
+            if [[ ! -f "$CRB_FILE" ]]; then
+              cat > "$CRB_FILE" <<EOF
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: tenant-${AD_GROUP}
+            annotations:
+              argocd.argoproj.io/sync-wave: "0"
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-tenant
+          subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: Group
+            name: ${AD_GROUP}
+          EOF
+              echo "Created ClusterRoleBinding: $CRB_FILE"
+            fi
+          done
+
+          # Also add viewer access to the arc namespace
+          ARC_DIR="clusters/$DEST/namespaces/arc"
+          if [[ -d "$ARC_DIR" ]]; then
+            ARC_RB="$ARC_DIR/rb-viewer-${AD_GROUP}.yaml"
+            if [[ ! -f "$ARC_RB" ]]; then
+              cat > "$ARC_RB" <<EOF
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: viewer-${AD_GROUP}
+            namespace: arc
+            annotations:
+              argocd.argoproj.io/sync-wave: "0"
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: namespace-viewer
+          subjects:
+          - apiGroup: rbac.authorization.k8s.io
+            kind: Group
+            name: ${AD_GROUP}
+          EOF
+              echo "Created arc namespace viewer RoleBinding for $AD_GROUP"
+            fi
+          fi
+
+      - name: Apply capacity overrides
+        if: >-
+          github.event.inputs.max_runners != '' &&
+          github.event.inputs.dry_run != 'true'
+        run: |
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          OVERRIDES="${{ github.event.inputs.max_runners }}"
+          DEST_VALUES="clusters/$DEST/cluster-package-values.yaml"
+
+          SECTION="ghaRunners"
+          if [[ "${{ github.event.inputs.phase }}" == "shadow" ]]; then
+            SECTION="canaryApps.ghaRunners"
+          fi
+
+          IFS=',' read -ra PAIRS <<< "$OVERRIDES"
+          for pair in "${PAIRS[@]}"; do
+            KEY="${pair%%=*}"
+            MAX="${pair##*=}"
+            VALUE_PATH=$(yq eval ".argocdApplications.${SECTION}.\"${KEY}\".helm.valueFiles" "$DEST_VALUES" 2>/dev/null)
+            if [[ -n "$VALUE_PATH" && "$VALUE_PATH" != "null" && -f "$VALUE_PATH" ]]; then
+              yq eval ".maxRunners = $MAX" -i "$VALUE_PATH"
+              echo "Set maxRunners=$MAX in $VALUE_PATH"
+            else
+              echo "::warning::Could not find value file for runner $KEY"
+            fi
+          done
+
+      - name: Validate manifests
+        if: github.event.inputs.phase != 'verify' && github.event.inputs.dry_run != 'true'
+        run: |
+          if [[ -f scripts/static-validation/verify-yaml-syntax.sh ]]; then
+            bash scripts/static-validation/verify-yaml-syntax.sh
+          fi
+          if [[ -f scripts/static-validation/verify-paths.sh ]]; then
+            bash scripts/static-validation/verify-paths.sh
+          fi
+
+      - name: Commit and push
+        if: github.event.inputs.phase != 'verify' && github.event.inputs.dry_run != 'true'
+        run: |
+          PHASE="${{ github.event.inputs.phase }}"
+          TENANT="${{ steps.resolve.outputs.tenant }}"
+          SRC="${{ github.event.inputs.source_cluster }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          NS="${{ steps.resolve.outputs.namespaces }}"
+          BRANCH="${{ steps.branches.outputs.branch }}"
+          RBAC="${{ github.event.inputs.include_rbac }}"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          case "$PHASE" in
+            shadow)  MSG="migration(shadow): deploy ${TENANT} canary runners on ${DEST} [${NS}]" ;;
+            drain)   MSG="migration(drain): set min/maxRunners=0 for ${TENANT} on ${SRC} [${NS}]" ;;
+            delete-source) MSG="migration(delete): remove ${TENANT} runners from ${SRC} [${NS}]" ;;
+            promote) MSG="migration(promote): promote ${TENANT} to production on ${DEST} [${NS}]" ;;
+          esac
+
+          git commit -m "$MSG"
+          git push -u origin "$BRANCH"
+
+      - name: Dry-run summary
+        if: github.event.inputs.dry_run == 'true'
+        run: |
+          echo "### Dry-Run Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "No files were modified. Review the migration script output above." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To execute for real, re-run this workflow with **dry_run** unchecked." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create Pull Request
+        if: github.event.inputs.phase != 'verify' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PHASE="${{ github.event.inputs.phase }}"
+          TENANT="${{ steps.resolve.outputs.tenant }}"
+          SRC="${{ github.event.inputs.source_cluster }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          NS="${{ steps.resolve.outputs.namespaces }}"
+          BRANCH="${{ steps.branches.outputs.branch }}"
+          BASE="${{ steps.branches.outputs.base }}"
+          AD_GROUP="${{ steps.resolve.outputs.ad_group }}"
+          RBAC="${{ github.event.inputs.include_rbac }}"
+          MAX_RUNNERS="${{ github.event.inputs.max_runners }}"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --base "$BASE" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [[ -n "$EXISTING_PR" ]]; then
+            echo "PR #$EXISTING_PR already exists for branch $BRANCH → $BASE"
+            echo "Updated with new commits."
+            echo "### PR Updated" >> "$GITHUB_STEP_SUMMARY"
+            echo "Pushed new commits to [PR #$EXISTING_PR]($(gh pr view $EXISTING_PR --json url --jq .url))" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          case "$PHASE" in
+            shadow)
+              TITLE="[Migration] Shadow deploy ${TENANT}: ${SRC} → ${DEST}"
+              BODY="$(cat <<'ENDOFBODY'
+          ## Migration: Shadow Deploy
+
+          | Setting | Value |
+          |---|---|
+          | **Tenant** | `TENANT_PH` |
+          | **Source** | `SRC_PH` |
+          | **Destination** | `DEST_PH` |
+          | **Namespaces** | `NS_PH` |
+          | **AD Group** | `GROUP_PH` |
+          | **RBAC** | RBAC_PH |
+          | **Capacity Override** | MAXR_PH |
+
+          ### What this PR does
+          - Creates namespace directories and manifests on destination
+          - Copies runner value files and ESO secret definitions
+          - Adds runners to `canaryApps` with `.test` release name suffix
+          - Creates RBAC manifests (if enabled)
+          - ArgoCD deploys shadow runners from **staging**
+
+          ### Checklist
+          - [ ] Merge to **staging**
+          - [ ] ArgoCD synced on destination
+          - [ ] `.test` runners visible in GitHub runner settings
+          - [ ] Tenant tested and approved
+          - [ ] Ready for **drain** phase
+
+          ### Next phase
+          Run the workflow again with **phase: drain** to stop runners on the source cluster.
+          ENDOFBODY
+          )"
+              BODY="${BODY//TENANT_PH/$TENANT}"
+              BODY="${BODY//SRC_PH/$SRC}"
+              BODY="${BODY//DEST_PH/$DEST}"
+              BODY="${BODY//NS_PH/$NS}"
+              BODY="${BODY//GROUP_PH/$AD_GROUP}"
+              BODY="${BODY//RBAC_PH/$RBAC}"
+              BODY="${BODY//MAXR_PH/${MAX_RUNNERS:-none}}"
+              ;;
+            drain)
+              TITLE="[Migration] Drain ${TENANT}: ${SRC}"
+              BODY="$(cat <<EOF
+          ## Migration: Drain Source
+
+          | Setting | Value |
+          |---|---|
+          | **Tenant** | \`$TENANT\` |
+          | **Source** | \`$SRC\` |
+          | **Namespaces** | \`$NS\` |
+
+          ### What this PR does
+          - Sets \`minRunners: 0\` and \`maxRunners: 0\` on source runners
+
+          ### Checklist
+          - [ ] Merge to **staging**, then promote to **main**
+          - [ ] All running jobs on source completed
+          - [ ] Source pods scaled to 0
+          - [ ] Ready for **delete-source** phase
+          EOF
+          )" ;;
+            delete-source)
+              TITLE="[Migration] Delete ${TENANT} from ${SRC}"
+              BODY="$(cat <<EOF
+          ## Migration: Delete Source Listeners
+
+          | Setting | Value |
+          |---|---|
+          | **Tenant** | \`$TENANT\` |
+          | **Source** | \`$SRC\` |
+          | **Namespaces** | \`$NS\` |
+
+          ### What this PR does
+          - Removes runner entries, namespace, ESO config from source
+
+          ### Checklist
+          - [ ] Merge to **staging**, then promote to **main**
+          - [ ] Old listeners deregistered from GitHub
+          - [ ] **CRITICAL**: Confirm old release names are free before **promote**
+          - [ ] Ready for **promote** phase
+          EOF
+          )" ;;
+            promote)
+              TITLE="[Migration] Promote ${TENANT} to production: ${DEST}"
+              BODY="$(cat <<EOF
+          ## Migration: Promote to Production
+
+          | Setting | Value |
+          |---|---|
+          | **Tenant** | \`$TENANT\` |
+          | **Destination** | \`$DEST\` |
+          | **Namespaces** | \`$NS\` |
+
+          ### What this PR does
+          - Moves runners from \`canaryApps\` → \`ghaRunners\` (removes \`.test\`)
+          - Moves namespaces to \`namespaceManager\` and \`externalSecrets\`
+
+          ### Checklist
+          - [ ] Merge to **staging**, then promote to **main**
+          - [ ] Production runners visible in GitHub
+          - [ ] Jobs being picked up by destination cluster
+          - [ ] Migration complete!
+          EOF
+          )" ;;
+          esac
+
+          PR_URL=$(gh pr create \
+            --title "$TITLE" \
+            --body "$BODY" \
+            --base "$BASE" \
+            --head "$BRANCH")
+
+          echo "### PR Created" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$TITLE]($PR_URL)" >> "$GITHUB_STEP_SUMMARY"
