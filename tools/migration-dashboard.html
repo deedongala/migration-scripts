@@ -553,38 +553,38 @@
   </div>
 
   <div class="card">
-    <h2>Drain Monitor</h2>
+    <h2>Live Runner Pods</h2>
     <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">
-      Track active runner pods while draining (min/max=0). Copy the script, run it in your terminal, and paste the output below.
+      Live pod counts from your cluster. Start the server:
+      <code style="background: var(--bg); padding: 2px 8px; border-radius: 4px;">python3 tools/drain-server.py --context &lt;cluster&gt;</code>
     </p>
     <div class="drain-section">
       <div class="drain-cluster-select">
-        <label style="font-size: 13px; color: var(--text-dim);">Cluster to drain:</label>
-        <select id="drainCluster" onchange="renderDrainCommand()" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; color: var(--text); font-size: 13px;">
-          <option value="prod-vultr-mi325">prod-vultr-mi325</option>
-          <option value="tw-mia1-mi355-public">tw-mia1-mi355-public</option>
-          <option value="do-atl1-vm-public">do-atl1-vm-public</option>
-          <option value="ccs-aus-bm-pvt-prd">ccs-aus-bm-pvt-prd</option>
-          <option value="vultr-ord-bm-public2">vultr-ord-bm-public2</option>
-          <option value="aks-saiscale-linux">aks-saiscale-linux</option>
-        </select>
-        <button class="btn btn-secondary" onclick="renderDrainCommand()" style="padding: 6px 14px; font-size: 12px;">Refresh Script</button>
-      </div>
-
-      <div>
-        <label style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block;">1. Copy &amp; run this in your terminal:</label>
-        <div class="drain-cmd-box" id="drainCmdBox">
-          <button class="copy-btn" onclick="copyDrainCmd()">Copy</button>
-          <span id="drainCmdText">Select tenants above to generate drain check script</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-size: 13px; color: var(--text-dim);">Server:</label>
+          <input type="text" id="drainServerUrl" value="http://localhost:8787"
+            style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; color: var(--text); font-size: 13px; font-family: monospace; width: 220px;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="liveIndicator" style="width: 8px; height: 8px; border-radius: 50%; background: var(--red); display: inline-block;"></span>
+          <span id="liveStatus" style="font-size: 12px; color: var(--text-dim);">Disconnected</span>
+        </div>
+        <button class="btn btn-secondary" onclick="fetchLivePods()" style="padding: 6px 14px; font-size: 12px;">Refresh Now</button>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+          <label for="autoRefresh" style="font-size: 12px; color: var(--text-dim);">Auto-refresh (10s)</label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="checkbox" id="filterSelected" onchange="fetchLivePods()">
+          <label for="filterSelected" style="font-size: 12px; color: var(--text-dim);">Selected tenants only</label>
         </div>
       </div>
 
-      <div>
-        <label style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block;">2. Paste the output here:</label>
-        <textarea class="drain-output-area" id="drainOutput" placeholder="Paste kubectl output here..." oninput="parseDrainOutput()"></textarea>
+      <div id="liveResults">
+        <div class="no-tenants-msg">Click "Refresh Now" or enable auto-refresh to fetch pod data</div>
       </div>
 
-      <div id="drainResults"></div>
+      <div id="runnerSetInfo" style="margin-top: 4px;"></div>
     </div>
   </div>
 
@@ -700,7 +700,6 @@ function onTenantSelectionChange() {
   info.classList.add('visible');
 
   renderMigrationLabels();
-  renderDrainCommand();
   updateSummary();
 }
 
@@ -1039,110 +1038,88 @@ function renderRunnerLabels() {
   body.innerHTML = rows.join('');
 }
 
-function getDrainNamespaces() {
-  const cluster = document.getElementById('drainCluster').value;
-  const nsList = [];
-  if (selectedTenants.size > 0) {
+let autoRefreshTimer = null;
+let lastPodData = null;
+
+async function fetchLivePods() {
+  const serverUrl = document.getElementById('drainServerUrl').value.replace(/\/+$/, '');
+  const indicator = document.getElementById('liveIndicator');
+  const statusEl = document.getElementById('liveStatus');
+  const container = document.getElementById('liveResults');
+  const runnerContainer = document.getElementById('runnerSetInfo');
+
+  let url = `${serverUrl}/pods`;
+  if (document.getElementById('filterSelected').checked && selectedTenants.size > 0) {
+    const allNs = [];
     selectedTenants.forEach(t => {
-      const d = TENANT_DATA[t];
-      if (d.clusters.includes(cluster)) {
-        d.ns.split(',').forEach(n => nsList.push(n.trim()));
-      }
+      TENANT_DATA[t].ns.split(',').forEach(n => allNs.push(n.trim()));
     });
+    url += `?ns=${allNs.join(',')}`;
   }
-  if (nsList.length === 0) {
-    Object.values(TENANT_DATA).forEach(d => {
-      if (d.clusters.includes(cluster)) {
-        d.ns.split(',').forEach(n => nsList.push(n.trim()));
-      }
-    });
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    lastPodData = data;
+
+    indicator.style.background = 'var(--green)';
+    statusEl.textContent = `Connected — ${data.cluster || 'unknown'} — ${new Date().toLocaleTimeString()}`;
+    statusEl.style.color = 'var(--green)';
+
+    renderLivePodTable(data, container);
+    renderRunnerSets(data, runnerContainer);
+  } catch (e) {
+    indicator.style.background = 'var(--red)';
+    statusEl.textContent = `Disconnected — ${e.message}`;
+    statusEl.style.color = 'var(--red)';
+    container.innerHTML = `<div style="padding: 16px; text-align: center;">
+      <div style="color: var(--red); margin-bottom: 8px;">Cannot connect to drain server</div>
+      <div style="color: var(--text-dim); font-size: 12px;">
+        Start the server in your terminal:<br>
+        <code style="background: var(--bg); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: inline-block;">
+          python3 tools/drain-server.py --context &lt;cluster-name&gt;
+        </code>
+      </div>
+    </div>`;
+    runnerContainer.innerHTML = '';
   }
-  return [...new Set(nsList)];
 }
 
-function renderDrainCommand() {
-  const cluster = document.getElementById('drainCluster').value;
-  const namespaces = getDrainNamespaces();
-  if (namespaces.length === 0) {
-    document.getElementById('drainCmdText').textContent = `# No namespaces found for cluster: ${cluster}`;
-    return;
-  }
-
-  const nsList = namespaces.map(n => `"${n}"`).join(' ');
-  const cmd = `# Drain check for ${cluster}
-# Run this in your terminal (kubectl context must be set to ${cluster})
-echo "DRAIN_START"
-for ns in ${nsList}; do
-  total=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  running=$(kubectl get pods -n "$ns" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  pending=$(kubectl get pods -n "$ns" --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  terminating=$(kubectl get pods -n "$ns" 2>/dev/null | grep Terminating | wc -l | tr -d ' ')
-  echo "NS:$ns|TOTAL:$total|RUNNING:$running|PENDING:$pending|TERMINATING:$terminating"
-done
-echo "DRAIN_END"`;
-
-  document.getElementById('drainCmdText').textContent = cmd;
-}
-
-function copyDrainCmd() {
-  const text = document.getElementById('drainCmdText').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('#drainCmdBox .copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 1500);
-  });
-}
-
-function parseDrainOutput() {
-  const raw = document.getElementById('drainOutput').value.trim();
-  const container = document.getElementById('drainResults');
-
-  if (!raw || !raw.includes('DRAIN_START')) {
-    container.innerHTML = '';
-    return;
-  }
-
-  const lines = raw.split('\n').filter(l => l.startsWith('NS:'));
-  if (lines.length === 0) {
-    container.innerHTML = '<div style="color: var(--text-dim); padding: 8px 0;">No namespace data found. Make sure you pasted the full output.</div>';
-    return;
-  }
-
+function renderLivePodTable(data, container) {
   const nsMap = {};
   Object.entries(TENANT_DATA).forEach(([key, d]) => {
     d.ns.split(',').forEach(n => { nsMap[n.trim()] = d.label; });
   });
 
-  let totalPods = 0;
+  const items = data.namespaces || [];
+  if (items.length === 0) {
+    container.innerHTML = '<div class="no-tenants-msg">No namespaces found</div>';
+    return;
+  }
+
+  let totalActive = 0;
   let allClear = true;
-  const rows = lines.map(line => {
-    const parts = {};
-    line.split('|').forEach(p => {
-      const [k, v] = p.split(':');
-      parts[k] = v;
-    });
-    const ns = parts['NS'] || '?';
-    const total = parseInt(parts['TOTAL'] || '0');
-    const running = parseInt(parts['RUNNING'] || '0');
-    const pending = parseInt(parts['PENDING'] || '0');
-    const terminating = parseInt(parts['TERMINATING'] || '0');
-    const active = running + pending + terminating;
-    totalPods += active;
+
+  const rows = items.map(ns => {
+    const active = ns.running + ns.pending + ns.terminating;
+    totalActive += active;
     if (active > 0) allClear = false;
 
-    const tenant = nsMap[ns] || '-';
-    const maxBar = Math.max(active, 1);
+    const tenant = nsMap[ns.namespace] || '-';
     const pct = active > 0 ? 100 : 0;
     const barClass = active === 0 ? 'drained' : 'active';
     const badgeClass = active === 0 ? 'clear' : 'running';
-    const badgeText = active === 0 ? 'Drained' : `${active} active`;
+    const badgeText = active === 0 ? 'No pods' : `${active} active`;
+
+    const errorNote = ns.error ? ` <span style="color:var(--red);font-size:11px;">(${ns.error})</span>` : '';
 
     return `<tr>
       <td><strong>${tenant}</strong></td>
-      <td><code>${ns}</code></td>
-      <td style="text-align: center;">${running}</td>
-      <td style="text-align: center;">${pending}</td>
-      <td style="text-align: center;">${terminating}</td>
+      <td><code>${ns.namespace}</code>${errorNote}</td>
+      <td style="text-align: center; color: ${ns.running > 0 ? 'var(--green)' : 'var(--text-dim)'}">${ns.running}</td>
+      <td style="text-align: center; color: ${ns.pending > 0 ? 'var(--yellow)' : 'var(--text-dim)'}">${ns.pending}</td>
+      <td style="text-align: center; color: ${ns.terminating > 0 ? 'var(--red)' : 'var(--text-dim)'}">${ns.terminating}</td>
       <td>
         <div class="drain-bar-bg"><div class="drain-bar-fill ${barClass}" style="width: ${pct}%"></div></div>
       </td>
@@ -1150,9 +1127,18 @@ function parseDrainOutput() {
     </tr>`;
   });
 
+  const totalRow = `<tr style="border-top: 2px solid var(--border);">
+    <td colspan="2"><strong>Total</strong></td>
+    <td style="text-align:center;"><strong>${items.reduce((s, n) => s + n.running, 0)}</strong></td>
+    <td style="text-align:center;"><strong>${items.reduce((s, n) => s + n.pending, 0)}</strong></td>
+    <td style="text-align:center;"><strong>${items.reduce((s, n) => s + n.terminating, 0)}</strong></td>
+    <td></td>
+    <td><strong>${totalActive} total</strong></td>
+  </tr>`;
+
   const banner = allClear
-    ? `<div class="drain-safe-banner safe">&#10003; All namespaces drained — safe to proceed with migration</div>`
-    : `<div class="drain-safe-banner waiting">&#9888; ${totalPods} pod(s) still active — waiting for drain to complete</div>`;
+    ? `<div class="drain-safe-banner safe">&#10003; All namespaces clear — safe to proceed</div>`
+    : `<div class="drain-safe-banner waiting">&#9888; ${totalActive} pod(s) still active across ${items.filter(n => (n.running + n.pending + n.terminating) > 0).length} namespace(s)</div>`;
 
   container.innerHTML = `
     ${banner}
@@ -1166,11 +1152,57 @@ function parseDrainOutput() {
         <th>Progress</th>
         <th>Status</th>
       </tr></thead>
-      <tbody>${rows.join('')}</tbody>
-    </table>
-    <p style="color: var(--text-dim); font-size: 11px; margin-top: 8px;">
-      Re-run the script and paste new output to refresh. All pods must reach 0 before proceeding.
-    </p>`;
+      <tbody>${rows.join('')}${totalRow}</tbody>
+    </table>`;
+}
+
+function renderRunnerSets(data, container) {
+  const sets = data.runnerSets || [];
+  if (sets.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const rows = sets.map(rs => {
+    const isDrained = rs.minRunners === 0 && rs.maxRunners === 0;
+    const statusBadge = isDrained
+      ? '<span class="drain-badge clear">Draining</span>'
+      : `<span class="drain-badge running">min:${rs.minRunners} max:${rs.maxRunners}</span>`;
+    return `<tr>
+      <td><code>${rs.namespace}</code></td>
+      <td><code>${rs.name}</code></td>
+      <td style="text-align:center;">${rs.minRunners}</td>
+      <td style="text-align:center;">${rs.maxRunners}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  });
+
+  container.innerHTML = `
+    <details style="margin-top: 8px;">
+      <summary style="cursor: pointer; color: var(--text-dim); font-size: 12px;">AutoScalingRunnerSets (${sets.length})</summary>
+      <table class="drain-table" style="margin-top: 8px;">
+        <thead><tr>
+          <th>Namespace</th>
+          <th>Runner Set</th>
+          <th style="text-align:center;">Min</th>
+          <th style="text-align:center;">Max</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </details>`;
+}
+
+function toggleAutoRefresh() {
+  if (document.getElementById('autoRefresh').checked) {
+    fetchLivePods();
+    autoRefreshTimer = setInterval(fetchLivePods, 10000);
+  } else {
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -1187,7 +1219,6 @@ window.addEventListener('DOMContentLoaded', () => {
   renderTenantGrid();
   renderClusterMap();
   renderRunnerLabels();
-  renderDrainCommand();
   updateSummary();
   saveRepo();
 });
