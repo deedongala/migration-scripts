@@ -704,20 +704,74 @@ const FALLBACK_CONFIG = {
   }
 };
 
+function guessGpuType(name) {
+  if (/mi325/i.test(name)) return 'MI325X';
+  if (/mi355/i.test(name)) return 'MI355X';
+  if (/mi300/i.test(name)) return 'MI300X';
+  if (/mi350/i.test(name)) return 'MI350';
+  if (/win/i.test(name)) return 'CPU';
+  if (/aks/i.test(name)) return 'CPU';
+  if (/aws|eks/i.test(name)) return 'Infra';
+  if (/conductor|oci/i.test(name)) return 'Infra';
+  if (/do-/i.test(name)) return 'MI300X/MI350';
+  return 'GPU';
+}
+
+function prettyLabel(name) {
+  return name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+async function discoverClustersFromGitHub(config) {
+  const token = document.getElementById('ghToken').value;
+  const repo = document.getElementById('ghRepo').value;
+  if (!token || !repo) return config;
+
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${repo}/contents/clusters`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+    });
+    if (!resp.ok) return config;
+    const items = await resp.json();
+    const dirs = items.filter(i => i.type === 'dir').map(i => i.name);
+
+    let added = 0;
+    dirs.forEach(name => {
+      if (!config.clusters[name]) {
+        config.clusters[name] = {
+          label: prettyLabel(name),
+          gpu: guessGpuType(name),
+          alertClusterName: null
+        };
+        added++;
+        console.log(`Auto-discovered new cluster: ${name}`);
+      }
+    });
+    if (added > 0) {
+      console.log(`Added ${added} new cluster(s) from GitHub`);
+    }
+  } catch (e) {
+    console.log('Could not discover clusters from GitHub:', e.message);
+  }
+  return config;
+}
+
 async function loadConfig() {
+  let config;
   try {
     const resp = await fetch('config/tenants.json');
     if (resp.ok) {
-      const config = await resp.json();
-      convertConfig(config);
+      config = await resp.json();
       console.log('Loaded config from tenants.json');
     } else {
       throw new Error('fetch failed');
     }
   } catch (e) {
     console.log('Using fallback config (tenants.json not found)');
-    convertConfig(FALLBACK_CONFIG);
+    config = JSON.parse(JSON.stringify(FALLBACK_CONFIG));
   }
+
+  config = await discoverClustersFromGitHub(config);
+  convertConfig(config);
   populateClusterDropdowns();
   renderTenantGrid();
   renderClusterMap();
