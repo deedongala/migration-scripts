@@ -1,0 +1,47 @@
+name: Sync Tenant Config
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6am UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync tenants.json from ossci-gitops
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout migration-scripts
+        uses: actions/checkout@v4
+
+      - name: Run sync script
+        env:
+          GH_TOKEN: ${{ secrets.OSSCI_GITOPS_TOKEN }}
+        run: |
+          python3 tools/sync-config.py \
+            --repo nod-ai/ossci-gitops \
+            --token "$GH_TOKEN" \
+            --output tools/config/tenants.json
+
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet tools/config/tenants.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes detected"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected in tenants.json"
+            git diff --stat tools/config/tenants.json
+          fi
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tools/config/tenants.json
+          git commit -m "chore: auto-sync tenants.json from ossci-gitops"
+          git push
