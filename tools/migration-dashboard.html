@@ -149,6 +149,107 @@
   .tenant-info.visible { display: block; }
   .tenant-info strong { color: var(--text); }
 
+  .tenant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tenant-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+  }
+  .tenant-chip:hover { border-color: var(--text-dim); }
+  .tenant-chip.selected { border-color: var(--accent); background: #0c2d6b22; }
+  .tenant-chip input { accent-color: var(--accent); cursor: pointer; }
+  .tenant-chip .chip-label { font-weight: 500; }
+  .tenant-chip .chip-group { color: var(--text-dim); font-size: 11px; font-family: monospace; }
+
+  .select-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+  .select-actions button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .select-actions button:hover { text-decoration: underline; }
+
+  .cluster-map-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .cluster-map-table th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cluster-map-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cluster-map-table tr:last-child td { border-bottom: none; }
+  .cluster-map-table .label-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #1c2128;
+    border: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 11px;
+    margin: 2px 2px;
+  }
+  .cluster-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .cluster-dot.vultr { background: var(--green); }
+  .cluster-dot.tw { background: var(--purple); }
+  .cluster-dot.do { background: var(--accent); }
+  .cluster-dot.ccs { background: var(--yellow); }
+  .cluster-dot.aks { background: var(--red); }
+
+  .batch-summary {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .batch-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .batch-item:last-child { border-bottom: none; }
+  .batch-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .batch-status.queued { background: #2e1e00; color: var(--yellow); }
+  .batch-status.running { background: #0c2d6b; color: var(--accent); }
+  .batch-status.done { background: #0d2818; color: var(--green); }
+  .batch-status.failed { background: #2d1215; color: var(--red); }
+
   .summary {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -292,24 +393,18 @@
   </div>
 
   <div class="card">
-    <h2><span class="step">2</span> Configuration</h2>
+    <h2><span class="step">2</span> Select Tenants</h2>
+    <div class="select-actions">
+      <button onclick="selectAllTenants()">Select All</button>
+      <button onclick="deselectAllTenants()">Clear All</button>
+    </div>
+    <div class="tenant-grid" id="tenantGrid"></div>
+    <div class="tenant-info" id="tenantInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span> Configuration</h2>
     <div class="form-grid">
-      <div class="form-group">
-        <label>Tenant</label>
-        <select id="tenant" onchange="onTenantChange()">
-          <option value="sglang">SGLang</option>
-          <option value="vllm">vLLM</option>
-          <option value="pytorch">PyTorch / ROCm</option>
-          <option value="hf">HuggingFace</option>
-          <option value="jax">JAX / XLA</option>
-          <option value="rad">RAD</option>
-          <option value="iree">IREE</option>
-          <option value="aims">AIMS</option>
-          <option value="aiter">AIter</option>
-          <option value="triton">Triton</option>
-          <option value="custom">Custom...</option>
-        </select>
-      </div>
       <div class="form-group">
         <label>Source Cluster</label>
         <select id="sourceCluster">
@@ -333,7 +428,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Namespaces</label>
+        <label>Namespaces (auto-filled from tenants, or override)</label>
         <input type="text" id="namespaces" value="all" placeholder="all or comma-separated">
       </div>
       <div class="form-group">
@@ -351,18 +446,41 @@
         </div>
       </div>
     </div>
-
-    <div class="tenant-info" id="tenantInfo"></div>
   </div>
 
   <div class="card">
-    <h2><span class="step">3</span> Review & Execute</h2>
+    <h2><span class="step">4</span> Review & Execute</h2>
     <div class="summary" id="summary"></div>
+    <div id="batchPreview"></div>
     <div class="actions">
-      <button class="btn btn-primary" id="runBtn" onclick="triggerMigration()">Run Migration</button>
-      <button class="btn btn-secondary" onclick="triggerMigration(true)">Dry Run</button>
+      <button class="btn btn-primary" id="runBtn" onclick="triggerBatchMigration()">Run Migration</button>
+      <button class="btn btn-secondary" onclick="triggerBatchMigration(true)">Dry Run</button>
+      <button class="btn btn-secondary" onclick="exportPlan()">Export Plan</button>
     </div>
     <div class="status" id="status"></div>
+    <div id="batchStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cluster Map</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">Which tenants are on which clusters right now.</p>
+    <table class="cluster-map-table">
+      <thead>
+        <tr><th>Tenant</th><th>Clusters</th><th>Namespaces</th><th>AD Group</th></tr>
+      </thead>
+      <tbody id="clusterMapBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Runner Labels</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">Share these <code>runs-on</code> labels with tenants.</p>
+    <table class="cluster-map-table">
+      <thead>
+        <tr><th>Tenant</th><th>Cluster</th><th>Label (runs-on)</th></tr>
+      </thead>
+      <tbody id="runnerLabelsBody"></tbody>
+    </table>
   </div>
 
   <div class="card">
@@ -377,23 +495,34 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2>Quick Links</h2>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <a class="btn btn-secondary" href="https://amd.atlassian.net/wiki/spaces/SHARK/pages/1117873024/Playbook+CI+Runner+Migration" target="_blank" style="text-decoration:none;">Migration Playbook</a>
+      <a class="btn btn-secondary" href="https://amd.atlassian.net/wiki/spaces/SHARK/pages/1184784884/How+to+Onboard+a+New+ARC+Runner" target="_blank" style="text-decoration:none;">Onboarding Guide</a>
+      <a class="btn btn-secondary" href="https://amd.atlassian.net/wiki/spaces/SHARK/pages/1591146839/How+To+Troubleshoot+CI+Runner+Issues" target="_blank" style="text-decoration:none;">Troubleshooting</a>
+      <a class="btn btn-secondary" id="actionsLink" href="#" target="_blank" style="text-decoration:none;">GitHub Actions</a>
+    </div>
+  </div>
+
 </div>
 
 <script>
 const TENANT_DATA = {
-  sglang:  { group: 'sglang_ci_runner',       ns: 'arc-sglang',       clusters: 'prod-vultr-mi325, tw-mia1-mi355-public' },
-  vllm:    { group: 'frameworks-devops',       ns: 'arc-vllm',         clusters: 'prod-vultr-mi325, tw-mia1-mi355-public' },
-  pytorch: { group: 'AIG-TheRock-OSSCI-Infra', ns: 'arc-rocm, arc-meta-pytorch, arc-pytorch-mi325-gpu-1, arc-pytorch-mi325-gpu-2, arc-pytorch-mi325-gpu-4, arc-pytorch-mi325-gpu-8', clusters: 'prod-vultr-mi325, ccs-aus-bm-pvt-prd' },
-  hf:      { group: 'dl-automation',           ns: 'arc-hf',           clusters: 'prod-vultr-mi325' },
-  jax:     { group: 'dl.sec-JAX',              ns: 'arc-jax, arc-rocm-jax, arc-xla, jax-framework-dev', clusters: 'do-atl1-vm-public' },
-  rad:     { group: 'dsg.RAD_CI',              ns: 'arc-rad',          clusters: 'do-atl1-vm-public' },
-  iree:    { group: 'iree-dev',                ns: 'iree-dev, arc-iree-mi325-gpu-1, arc-iree-mi325-gpu-2', clusters: 'tw-mia1-mi355-public, prod-vultr-mi325' },
-  aims:    { group: 'aimsdevgroup',            ns: 'aims-dev',         clusters: 'prod-vultr-mi325' },
-  aiter:   { group: '',                        ns: 'arc-aiter',        clusters: 'prod-vultr-mi325' },
-  triton:  { group: '',                        ns: 'arc-triton-gpu-1, arc-triton-distributed-gpu-8', clusters: 'prod-vultr-mi325' },
+  sglang:  { label: 'SGLang',         group: 'sglang_ci_runner',       ns: 'arc-sglang',       clusters: 'prod-vultr-mi325, tw-mia1-mi355-public', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-sglang', 'tw-mia1-mi355-public': 'linux-mi355-1gpu-sglang' } },
+  vllm:    { label: 'vLLM',           group: 'frameworks-devops',       ns: 'arc-vllm',         clusters: 'prod-vultr-mi325, tw-mia1-mi355-public', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-vllm', 'tw-mia1-mi355-public': 'linux-mi355-1gpu-vllm' } },
+  pytorch: { label: 'PyTorch / ROCm', group: 'AIG-TheRock-OSSCI-Infra', ns: 'arc-rocm,arc-meta-pytorch,arc-pytorch-mi325-gpu-1,arc-pytorch-mi325-gpu-2,arc-pytorch-mi325-gpu-4,arc-pytorch-mi325-gpu-8', clusters: 'prod-vultr-mi325, ccs-aus-bm-pvt-prd', runLabels: { 'prod-vultr-mi325': 'linux-gfx942-1gpu-ossci-rocm', 'ccs-aus-bm-pvt-prd': 'linux-gfx942-1gpu-ccs-ossci-rocm' } },
+  hf:      { label: 'HuggingFace',    group: 'dl-automation',           ns: 'arc-hf',           clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-hf' } },
+  jax:     { label: 'JAX / XLA',      group: 'dl.sec-JAX',              ns: 'arc-jax,arc-rocm-jax,arc-xla,jax-framework-dev', clusters: 'do-atl1-vm-public', runLabels: { 'do-atl1-vm-public': 'linux-mi300-jax' } },
+  rad:     { label: 'RAD',            group: 'dsg.RAD_CI',              ns: 'arc-rad',          clusters: 'do-atl1-vm-public', runLabels: { 'do-atl1-vm-public': 'linux-mi300-rad' } },
+  iree:    { label: 'IREE',           group: 'iree-dev',                ns: 'iree-dev,arc-iree-mi325-gpu-1,arc-iree-mi325-gpu-2', clusters: 'tw-mia1-mi355-public, prod-vultr-mi325', runLabels: { 'tw-mia1-mi355-public': 'linux-mi355-iree', 'prod-vultr-mi325': 'linux-mi325-1gpu-iree' } },
+  aims:    { label: 'AIMS',           group: 'aimsdevgroup',            ns: 'aims-dev',         clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-aims' } },
+  aiter:   { label: 'AIter',          group: '',                        ns: 'arc-aiter',        clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-aiter' } },
+  triton:  { label: 'Triton',         group: '',                        ns: 'arc-triton-gpu-1,arc-triton-distributed-gpu-8', clusters: 'prod-vultr-mi325', runLabels: { 'prod-vultr-mi325': 'linux-mi325-1gpu-triton' } },
 };
 
 let selectedPhase = 'shadow';
+let selectedTenants = new Set();
 
 function selectPhase(phase) {
   selectedPhase = phase;
@@ -402,41 +531,98 @@ function selectPhase(phase) {
   updateSummary();
 }
 
-function onTenantChange() {
-  const tenant = document.getElementById('tenant').value;
-  const info = document.getElementById('tenantInfo');
-  const data = TENANT_DATA[tenant];
-  if (data) {
-    info.innerHTML = `<strong>AD Group:</strong> ${data.group || 'none'} &nbsp; <strong>Namespaces:</strong> ${data.ns} &nbsp; <strong>Current Clusters:</strong> ${data.clusters}`;
-    info.classList.add('visible');
-    document.getElementById('namespaces').value = data.ns.replace(/, /g, ',');
+function toggleTenant(key) {
+  if (selectedTenants.has(key)) {
+    selectedTenants.delete(key);
   } else {
-    info.classList.remove('visible');
+    selectedTenants.add(key);
   }
+  renderTenantGrid();
+  onTenantSelectionChange();
+}
+
+function selectAllTenants() {
+  Object.keys(TENANT_DATA).forEach(k => selectedTenants.add(k));
+  renderTenantGrid();
+  onTenantSelectionChange();
+}
+
+function deselectAllTenants() {
+  selectedTenants.clear();
+  renderTenantGrid();
+  onTenantSelectionChange();
+}
+
+function renderTenantGrid() {
+  const grid = document.getElementById('tenantGrid');
+  grid.innerHTML = Object.entries(TENANT_DATA).map(([key, data]) => {
+    const sel = selectedTenants.has(key);
+    return `<div class="tenant-chip ${sel ? 'selected' : ''}" onclick="toggleTenant('${key}')">
+      <input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation(); toggleTenant('${key}')">
+      <div>
+        <div class="chip-label">${data.label}</div>
+        <div class="chip-group">${data.group || 'no group'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onTenantSelectionChange() {
+  const info = document.getElementById('tenantInfo');
+  if (selectedTenants.size === 0) {
+    info.classList.remove('visible');
+    document.getElementById('namespaces').value = '';
+    updateSummary();
+    return;
+  }
+
+  const allNs = [];
+  const allGroups = [];
+  selectedTenants.forEach(t => {
+    const d = TENANT_DATA[t];
+    if (d.ns) allNs.push(...d.ns.split(','));
+    if (d.group) allGroups.push(d.group);
+  });
+
+  const uniqueNs = [...new Set(allNs)].join(',');
+  document.getElementById('namespaces').value = uniqueNs;
+
+  info.innerHTML = `<strong>Selected:</strong> ${selectedTenants.size} tenant(s) &nbsp; <strong>Namespaces:</strong> ${allNs.length} &nbsp; <strong>AD Groups:</strong> ${[...new Set(allGroups)].join(', ') || 'none'}`;
+  info.classList.add('visible');
+
   updateSummary();
 }
 
 function updateSummary() {
   const s = document.getElementById('summary');
-  const tenant = document.getElementById('tenant').value;
+  const tenants = [...selectedTenants].join(', ') || 'none selected';
   const src = document.getElementById('sourceCluster').value;
   const dest = document.getElementById('destCluster').value;
   const ns = document.getElementById('namespaces').value || 'all';
   const maxR = document.getElementById('maxRunners').value || 'none';
   const rbac = document.getElementById('includeRbac').checked ? 'Yes' : 'No';
   const dry = document.getElementById('dryRun').checked ? 'Yes' : 'No';
-  const group = TENANT_DATA[tenant]?.group || 'none';
 
   s.textContent =
 `Phase:        ${selectedPhase}
-Tenant:       ${tenant}
-AD Group:     ${group}
+Tenants:      ${tenants} (${selectedTenants.size})
 Source:        ${src}
 Destination:  ${dest}
 Namespaces:   ${ns}
 Max Runners:  ${maxR}
 RBAC:         ${rbac}
 Dry-run:      ${dry}`;
+
+  const preview = document.getElementById('batchPreview');
+  if (selectedTenants.size > 1) {
+    preview.innerHTML = '<div class="batch-summary"><strong>Batch order:</strong>' +
+      [...selectedTenants].map((t, i) => {
+        const d = TENANT_DATA[t];
+        return `<div class="batch-item"><span style="color:var(--text-dim);width:20px;">${i+1}.</span> <strong>${d.label}</strong> <span style="color:var(--text-dim);font-size:12px;margin-left:auto;">${d.ns}</span></div>`;
+      }).join('') + '</div>';
+  } else {
+    preview.innerHTML = '';
+  }
 }
 
 function showStatus(type, msg) {
@@ -445,11 +631,12 @@ function showStatus(type, msg) {
   s.innerHTML = msg;
 }
 
-async function triggerMigration(forceDry = false) {
+async function triggerBatchMigration(forceDry = false) {
   const token = document.getElementById('ghToken').value;
   const repo = document.getElementById('ghRepo').value;
   if (!token) { showStatus('error', 'GitHub token required'); return; }
   if (!repo) { showStatus('error', 'Repository required'); return; }
+  if (selectedTenants.size === 0) { showStatus('error', 'Select at least one tenant'); return; }
 
   const src = document.getElementById('sourceCluster').value;
   const dest = document.getElementById('destCluster').value;
@@ -457,14 +644,60 @@ async function triggerMigration(forceDry = false) {
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
-  showStatus('info', '<span class="spinner"></span> Triggering workflow...');
+
+  const tenantList = [...selectedTenants];
+  const batchEl = document.getElementById('batchStatus');
+
+  if (tenantList.length === 1) {
+    showStatus('info', '<span class="spinner"></span> Triggering workflow...');
+    await triggerSingle(tenantList[0], forceDry);
+  } else {
+    showStatus('info', `<span class="spinner"></span> Triggering ${tenantList.length} workflows...`);
+    batchEl.innerHTML = '<div class="batch-summary" style="margin-top:12px;">' +
+      tenantList.map(t => `<div class="batch-item" id="batch-${t}"><strong>${TENANT_DATA[t].label}</strong><span class="batch-status queued" style="margin-left:auto;">Queued</span></div>`).join('') +
+      '</div>';
+
+    let success = 0, failed = 0;
+    for (const tenant of tenantList) {
+      const statusEl = document.querySelector(`#batch-${tenant} .batch-status`);
+      statusEl.textContent = 'Running';
+      statusEl.className = 'batch-status running';
+
+      const ok = await triggerSingle(tenant, forceDry, true);
+      if (ok) {
+        statusEl.textContent = 'Triggered';
+        statusEl.className = 'batch-status done';
+        success++;
+      } else {
+        statusEl.textContent = 'Failed';
+        statusEl.className = 'batch-status failed';
+        failed++;
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    if (failed === 0) {
+      showStatus('success', `All ${success} workflows triggered! <a href="https://github.com/${repo}/actions/workflows/migrate-runners.yaml" target="_blank">View in GitHub Actions</a>`);
+    } else {
+      showStatus('warning', `${success} triggered, ${failed} failed. <a href="https://github.com/${repo}/actions/workflows/migrate-runners.yaml" target="_blank">View in GitHub Actions</a>`);
+    }
+  }
+  btn.disabled = false;
+}
+
+async function triggerSingle(tenant, forceDry = false, silent = false) {
+  const token = document.getElementById('ghToken').value;
+  const repo = document.getElementById('ghRepo').value;
+  const src = document.getElementById('sourceCluster').value;
+  const dest = document.getElementById('destCluster').value;
+  const data = TENANT_DATA[tenant];
 
   const inputs = {
-    tenant: document.getElementById('tenant').value,
+    tenant: tenant,
     phase: selectedPhase,
     source_cluster: src,
     destination_cluster: dest,
-    namespaces: document.getElementById('namespaces').value || 'all',
+    namespaces: data.ns || 'all',
     max_runners: document.getElementById('maxRunners').value || '',
     include_rbac: document.getElementById('includeRbac').checked ? 'true' : 'false',
     dry_run: (forceDry || document.getElementById('dryRun').checked) ? 'true' : 'false',
@@ -482,16 +715,56 @@ async function triggerMigration(forceDry = false) {
     });
 
     if (resp.status === 204) {
-      showStatus('success', `Workflow triggered! <a href="https://github.com/${repo}/actions/workflows/migrate-runners.yaml" target="_blank">View in GitHub Actions &rarr;</a>`);
+      if (!silent) showStatus('success', `Workflow triggered for ${data.label}! <a href="https://github.com/${repo}/actions/workflows/migrate-runners.yaml" target="_blank">View in GitHub Actions</a>`);
       saveHistory(inputs);
+      return true;
     } else {
       const err = await resp.json().catch(() => ({}));
-      showStatus('error', `Failed (${resp.status}): ${err.message || 'Unknown error'}`);
+      if (!silent) showStatus('error', `Failed (${resp.status}): ${err.message || 'Unknown error'}`);
+      return false;
     }
   } catch (e) {
-    showStatus('error', `Network error: ${e.message}`);
+    if (!silent) showStatus('error', `Network error: ${e.message}`);
+    return false;
   }
-  btn.disabled = false;
+}
+
+function exportPlan() {
+  const tenants = [...selectedTenants];
+  if (tenants.length === 0) { showStatus('error', 'Select at least one tenant'); return; }
+
+  const src = document.getElementById('sourceCluster').value;
+  const dest = document.getElementById('destCluster').value;
+  const now = new Date().toISOString().split('T')[0];
+
+  let md = `# CI Runner Migration Plan\n\n`;
+  md += `**Date:** ${now}\n`;
+  md += `**Phase:** ${selectedPhase}\n`;
+  md += `**Source:** \`${src}\`\n`;
+  md += `**Destination:** \`${dest}\`\n\n`;
+  md += `## Tenants\n\n`;
+  md += `| Tenant | Namespaces | AD Group | Status |\n`;
+  md += `|---|---|---|---|\n`;
+  tenants.forEach(t => {
+    const d = TENANT_DATA[t];
+    md += `| ${d.label} | \`${d.ns}\` | \`${d.group || 'none'}\` | Pending |\n`;
+  });
+  md += `\n## Checklist\n\n`;
+  md += `- [ ] Shadow runners deployed\n`;
+  md += `- [ ] Smoke tests passed\n`;
+  md += `- [ ] Tenants notified and approved\n`;
+  md += `- [ ] Soak period complete (24-48h)\n`;
+  md += `- [ ] Source drained\n`;
+  md += `- [ ] Source deleted\n`;
+  md += `- [ ] Promoted to production\n`;
+  md += `- [ ] Migration verified\n`;
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `migration-plan-${now}.md`;
+  a.click();
+  showStatus('success', 'Migration plan exported!');
 }
 
 async function loadRuns() {
@@ -514,8 +787,7 @@ async function loadRuns() {
     }
 
     hist.innerHTML = data.workflow_runs.map(run => {
-      const statusMap = { completed: 'success', in_progress: 'running', queued: 'pending', failure: 'failed' };
-      const dotClass = run.conclusion === 'failure' ? 'failed' : (statusMap[run.status] || 'pending');
+      const dotClass = run.conclusion === 'failure' ? 'failed' : run.conclusion === 'success' ? 'success' : run.status === 'in_progress' ? 'running' : 'pending';
       const time = new Date(run.created_at).toLocaleString();
       return `<div class="history-item">
         <span class="history-dot ${dotClass}"></span>
@@ -531,15 +803,47 @@ async function loadRuns() {
 function saveHistory(inputs) {
   const runs = JSON.parse(localStorage.getItem('migration_runs') || '[]');
   runs.unshift({ ...inputs, timestamp: new Date().toISOString() });
-  if (runs.length > 20) runs.pop();
+  if (runs.length > 50) runs.pop();
   localStorage.setItem('migration_runs', JSON.stringify(runs));
 }
 
-function saveToken() {
-  localStorage.setItem('gh_token', document.getElementById('ghToken').value);
-}
+function saveToken() { localStorage.setItem('gh_token', document.getElementById('ghToken').value); }
 function saveRepo() {
   localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
+  document.getElementById('actionsLink').href = `https://github.com/${document.getElementById('ghRepo').value}/actions/workflows/migrate-runners.yaml`;
+}
+
+function renderClusterMap() {
+  const body = document.getElementById('clusterMapBody');
+  const clusterColors = { 'prod-vultr-mi325': 'vultr', 'tw-mia1-mi355-public': 'tw', 'do-atl1-vm-public': 'do', 'ccs-aus-bm-pvt-prd': 'ccs', 'aks-saiscale-linux': 'aks', 'vultr-ord-bm-public2': 'vultr' };
+
+  body.innerHTML = Object.entries(TENANT_DATA).map(([key, d]) => {
+    const clusters = d.clusters.split(', ').map(c =>
+      `<span><span class="cluster-dot ${clusterColors[c] || ''}"></span>${c}</span>`
+    ).join('<br>');
+    const nsList = d.ns.split(',').map(n => `<span class="label-tag">${n.trim()}</span>`).join(' ');
+    return `<tr>
+      <td><strong>${d.label}</strong></td>
+      <td>${clusters}</td>
+      <td>${nsList}</td>
+      <td style="font-family:monospace;font-size:12px;">${d.group || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRunnerLabels() {
+  const body = document.getElementById('runnerLabelsBody');
+  const rows = [];
+  Object.entries(TENANT_DATA).forEach(([key, d]) => {
+    Object.entries(d.runLabels || {}).forEach(([cluster, label]) => {
+      rows.push(`<tr>
+        <td><strong>${d.label}</strong></td>
+        <td style="font-size:12px;">${cluster}</td>
+        <td><span class="label-tag">${label}</span></td>
+      </tr>`);
+    });
+  });
+  body.innerHTML = rows.join('');
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -553,8 +857,11 @@ window.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', updateSummary);
   });
 
-  onTenantChange();
+  renderTenantGrid();
+  renderClusterMap();
+  renderRunnerLabels();
   updateSummary();
+  saveRepo();
 });
 </script>
 </body>
