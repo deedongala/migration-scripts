@@ -130,9 +130,26 @@ jobs:
 
           AD_GROUP="${TENANT_GROUP_MAP[$TENANT]:-}"
 
+          # Tenant → runner labels mapping (namespace:label pairs, pipe-separated per namespace)
+          declare -A TENANT_LABELS_MAP
+          TENANT_LABELS_MAP[sglang]="arc-sglang:linux-mi325-1gpu-sglang,linux-mi325-2gpu-sglang,linux-mi325-4gpu-sglang,linux-mi325-8gpu-sglang"
+          TENANT_LABELS_MAP[vllm]="arc-vllm:linux-mi325-1gpu-vllm"
+          TENANT_LABELS_MAP[pytorch]="arc-pytorch-mi325-gpu-1:linux.rocm.gpu.gfx942.1|arc-pytorch-mi325-gpu-2:linux.rocm.gpu.gfx942.2|arc-pytorch-mi325-gpu-4:linux.rocm.gpu.gfx942.4|arc-pytorch-mi325-gpu-8:linux.rocm.gpu.gfx942.8|arc-meta-pytorch:linux.rocm.gpu.gfx942.1.meta-pytorch,linux.rocm.gpu.gfx942.8.meta-pytorch"
+          TENANT_LABELS_MAP[rocm]="arc-rocm:linux-gfx942-1gpu-ossci-rocm"
+          TENANT_LABELS_MAP[hf]="arc-hf:amd-mi325-ci-1gpu,amd-mi325-ci-2gpu"
+          TENANT_LABELS_MAP[jax]="arc-jax:linux-x86-64-1gpu-amd,linux-x86-64-4gpu-amd,linux-x86-64-8gpu-amd|arc-rocm-jax:linux-x86-64-1gpu-amd,linux-x86-64-4gpu-amd,linux-x86-64-8gpu-amd|arc-xla:linux-x86-64-1gpu-amd,linux-x86-64-4gpu-amd,linux-x86-64-8gpu-amd"
+          TENANT_LABELS_MAP[rad]="arc-rad:linux-mi325-8gpu-ossci-rad"
+          TENANT_LABELS_MAP[iree]="arc-iree-mi325-gpu-1:linux-mi325-1gpu-ossci-iree-org|arc-iree-mi325-gpu-2:linux-mi325-2gpu-ossci-iree-org"
+          TENANT_LABELS_MAP[aims]="aims-dev:linux-mi325-aims"
+          TENANT_LABELS_MAP[aiter]="arc-aiter:aiter-1gpu-runner,aiter-4gpu-runner,aiter-8gpu-runner"
+          TENANT_LABELS_MAP[triton]="arc-triton-gpu-1:amd-gfx942|arc-triton-distributed-gpu-8:amd-gfx942-mi325"
+
+          RUNNER_LABELS="${TENANT_LABELS_MAP[$TENANT]:-}"
+
           echo "namespaces=$NAMESPACES" >> "$GITHUB_OUTPUT"
           echo "ad_group=$AD_GROUP" >> "$GITHUB_OUTPUT"
           echo "tenant=$TENANT" >> "$GITHUB_OUTPUT"
+          echo "runner_labels=$RUNNER_LABELS" >> "$GITHUB_OUTPUT"
 
           echo "### Resolved Configuration" >> "$GITHUB_STEP_SUMMARY"
           echo "| Setting | Value |" >> "$GITHUB_STEP_SUMMARY"
@@ -334,6 +351,81 @@ jobs:
             fi
           fi
 
+      - name: Configure alerts on destination
+        if: >-
+          (github.event.inputs.phase == 'shadow' || github.event.inputs.phase == 'promote') &&
+          github.event.inputs.dry_run != 'true'
+        run: |
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          RUNNER_LABELS="${{ steps.resolve.outputs.runner_labels }}"
+          ALERTS_FILE="clusters/$DEST/gha-runner-alerts/values.yaml"
+
+          if [[ -z "$RUNNER_LABELS" ]]; then
+            echo "No runner labels configured for this tenant, skipping alerts"
+            exit 0
+          fi
+
+          # Determine clusterName from existing file or generate from directory name
+          if [[ -f "$ALERTS_FILE" ]]; then
+            CLUSTER_NAME=$(yq eval '.clusterName' "$ALERTS_FILE")
+          else
+            mkdir -p "$(dirname "$ALERTS_FILE")"
+            CLUSTER_NAME=$(echo "$DEST" | tr '[:lower:]-' '[:upper:]_')
+            echo "clusterName: \"$CLUSTER_NAME\"" > "$ALERTS_FILE"
+            echo "runners: {}" >> "$ALERTS_FILE"
+          fi
+
+          # Parse runner labels (format: ns:label1,label2|ns2:label3,label4)
+          IFS='|' read -ra NS_BLOCKS <<< "$RUNNER_LABELS"
+          for block in "${NS_BLOCKS[@]}"; do
+            NS="${block%%:*}"
+            LABELS="${block#*:}"
+            IFS=',' read -ra LABEL_ARRAY <<< "$LABELS"
+            for label in "${LABEL_ARRAY[@]}"; do
+              # Check if this label already exists for this namespace
+              EXISTS=$(yq eval ".runners.\"$NS\" // [] | .[] | select(. == \"$label\")" "$ALERTS_FILE")
+              if [[ -z "$EXISTS" ]]; then
+                yq eval ".runners.\"$NS\" += [\"$label\"]" -i "$ALERTS_FILE"
+                echo "Added alert for $NS: $label"
+              else
+                echo "Alert already exists for $NS: $label"
+              fi
+            done
+          done
+          echo "Updated alerts file: $ALERTS_FILE"
+
+      - name: Remove alerts from source
+        if: >-
+          github.event.inputs.phase == 'delete-source' &&
+          github.event.inputs.dry_run != 'true'
+        run: |
+          SRC="${{ github.event.inputs.source_cluster }}"
+          RUNNER_LABELS="${{ steps.resolve.outputs.runner_labels }}"
+          ALERTS_FILE="clusters/$SRC/gha-runner-alerts/values.yaml"
+
+          if [[ -z "$RUNNER_LABELS" || ! -f "$ALERTS_FILE" ]]; then
+            echo "No runner labels or alerts file found, skipping"
+            exit 0
+          fi
+
+          IFS='|' read -ra NS_BLOCKS <<< "$RUNNER_LABELS"
+          for block in "${NS_BLOCKS[@]}"; do
+            NS="${block%%:*}"
+            LABELS="${block#*:}"
+            IFS=',' read -ra LABEL_ARRAY <<< "$LABELS"
+            for label in "${LABEL_ARRAY[@]}"; do
+              yq eval "del(.runners.\"$NS\"[] | select(. == \"$label\"))" -i "$ALERTS_FILE"
+              echo "Removed alert for $NS: $label"
+            done
+            # If namespace has no more labels, remove the key
+            REMAINING=$(yq eval ".runners.\"$NS\" | length" "$ALERTS_FILE")
+            if [[ "$REMAINING" == "0" ]]; then
+              yq eval "del(.runners.\"$NS\")" -i "$ALERTS_FILE"
+              echo "Removed empty namespace $NS from alerts"
+            fi
+          done
+          echo "Updated alerts file: $ALERTS_FILE"
+
       - name: Apply capacity overrides
         if: >-
           github.event.inputs.max_runners != '' &&
@@ -452,6 +544,7 @@ jobs:
           - Copies runner value files and ESO secret definitions
           - Adds runners to `canaryApps` with `.test` release name suffix
           - Creates RBAC manifests (if enabled)
+          - Configures GHA runner alerts on destination cluster
           - ArgoCD deploys shadow runners from **staging**
 
           ### Checklist
@@ -507,6 +600,7 @@ jobs:
 
           ### What this PR does
           - Removes runner entries, namespace, ESO config from source
+          - Removes GHA runner alerts from source cluster
 
           ### Checklist
           - [ ] Merge to **staging**, then promote to **main**

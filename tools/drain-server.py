@@ -30,38 +30,8 @@ KNOWN_NAMESPACES = [
 
 
 def get_namespaces(context_args):
-    """Try dynamic discovery first, fall back to known namespaces."""
-    cmd = ["kubectl"] + context_args + [
-        "get", "namespaces", "-o", "jsonpath={.items[*].metadata.name}"
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        if result.returncode == 0 and result.stdout.strip():
-            all_ns = result.stdout.strip().split()
-            filtered = [
-                ns for ns in all_ns
-                if ns.startswith("arc-") or ns in (
-                    "iree-dev", "aims-dev", "buildkite-vllm", "jax-framework-dev"
-                )
-            ]
-            if filtered:
-                return filtered
-    except Exception:
-        pass
-
-    # Fall back: probe known namespaces to see which ones exist
-    valid = []
-    for ns in KNOWN_NAMESPACES:
-        probe = ["kubectl"] + context_args + [
-            "get", "pods", "-n", ns, "--no-headers", "--field-selector=status.phase!=Failed"
-        ]
-        try:
-            r = subprocess.run(probe, capture_output=True, text=True, timeout=5)
-            if r.returncode == 0:
-                valid.append(ns)
-        except Exception:
-            pass
-    return valid
+    """Return known runner namespaces directly."""
+    return list(KNOWN_NAMESPACES)
 
 
 def get_pod_counts(context_args, namespaces):
@@ -196,7 +166,7 @@ class DrainHandler(BaseHTTPRequestHandler):
         for i, arg in enumerate(DrainHandler.context_args):
             if arg == "--context" and i + 1 < len(DrainHandler.context_args):
                 return DrainHandler.context_args[i + 1]
-        cmd = ["kubectl", "config", "current-context"]
+        cmd = ["kubectl"] + DrainHandler.context_args + ["config", "current-context"]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             return result.stdout.strip()
@@ -222,17 +192,22 @@ def main():
     parser = argparse.ArgumentParser(description="Drain monitor server for migration dashboard")
     parser.add_argument("--port", type=int, default=8787, help="Port to listen on (default: 8787)")
     parser.add_argument("--context", type=str, help="kubectl context to use")
+    parser.add_argument("--kubeconfig", type=str, help="Path to kubeconfig file")
     args = parser.parse_args()
 
+    if args.kubeconfig:
+        DrainHandler.context_args.extend(["--kubeconfig", args.kubeconfig])
     if args.context:
-        DrainHandler.context_args = ["--context", args.context]
+        DrainHandler.context_args.extend(["--context", args.context])
 
     server = HTTPServer(("127.0.0.1", args.port), DrainHandler)
     ctx = args.context or "(current context)"
+    kc = args.kubeconfig or "(default)"
     print(f"\n  Drain Monitor Server")
     print(f"  ────────────────────")
-    print(f"  URL:      http://localhost:{args.port}")
-    print(f"  Context:  {ctx}")
+    print(f"  URL:        http://localhost:{args.port}")
+    print(f"  Context:    {ctx}")
+    print(f"  Kubeconfig: {kc}")
     print(f"  Endpoints:")
     print(f"    GET /pods          - pod counts per namespace")
     print(f"    GET /pods?ns=X,Y   - filter to specific namespaces")

@@ -504,6 +504,10 @@
           <label for="includeRbac">Include RBAC</label>
         </div>
         <div class="checkbox-group">
+          <input type="checkbox" id="includeAlerts" checked>
+          <label for="includeAlerts">Configure Alerts</label>
+        </div>
+        <div class="checkbox-group">
           <input type="checkbox" id="dryRun">
           <label for="dryRun">Dry-run (preview only)</label>
         </div>
@@ -781,6 +785,7 @@ function updateSummary() {
   const ns = document.getElementById('namespaces').value || 'all';
   const maxR = document.getElementById('maxRunners').value || 'none';
   const rbac = document.getElementById('includeRbac').checked ? 'Yes' : 'No';
+  const alerts = document.getElementById('includeAlerts').checked ? 'Yes' : 'No';
   const dry = document.getElementById('dryRun').checked ? 'Yes' : 'No';
 
   const labelLines = [...selectedTenants].map(t => {
@@ -799,6 +804,7 @@ Destination:  ${dest}
 Namespaces:   ${ns}
 Max Runners:  ${maxR}
 RBAC:         ${rbac}
+Alerts:       ${alerts}
 Dry-run:      ${dry}
 ${selectedTenants.size > 0 ? '\nRunner Labels:\n' + labelLines : ''}`;
 
@@ -947,6 +953,8 @@ function exportPlan() {
   md += `- [ ] Tenants notified and approved\n`;
   md += `- [ ] Soak period complete (24-48h)\n`;
   md += `- [ ] Source drained\n`;
+  md += `- [ ] Alerts configured on destination\n`;
+  md += `- [ ] Alerts removed from source\n`;
   md += `- [ ] Source deleted\n`;
   md += `- [ ] Promoted to production\n`;
   md += `- [ ] Migration verified\n`;
