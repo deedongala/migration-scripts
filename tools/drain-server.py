@@ -111,6 +111,86 @@ def get_runner_sets(context_args, namespaces):
     return results
 
 
+def verify_gpu(context_args, namespaces):
+    """Pick a running pod per namespace and run rocminfo + rocm-smi."""
+    results = []
+    for ns in namespaces:
+        entry = {"namespace": ns, "pod": None, "rocminfo": None, "rocm_smi": None, "status": "skip", "error": None}
+
+        cmd = ["kubectl"] + context_args + [
+            "get", "pods", "-n", ns,
+            "-o", "jsonpath={.items[?(@.status.phase=='Running')].metadata.name}",
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if proc.returncode != 0 or not proc.stdout.strip():
+                entry["error"] = "No running pods found"
+                results.append(entry)
+                continue
+
+            pods = proc.stdout.strip().split()
+            pod = pods[0]
+            entry["pod"] = pod
+
+            # Determine container name (use first non-dind container)
+            cont_cmd = ["kubectl"] + context_args + [
+                "get", "pod", pod, "-n", ns,
+                "-o", "jsonpath={.spec.containers[*].name}",
+            ]
+            cont_proc = subprocess.run(cont_cmd, capture_output=True, text=True, timeout=10)
+            containers = cont_proc.stdout.strip().split() if cont_proc.returncode == 0 else []
+            container = next((c for c in containers if "dind" not in c), containers[0] if containers else None)
+
+            container_args = ["-c", container] if container else []
+
+            # Run rocminfo
+            rocminfo_cmd = ["kubectl"] + context_args + [
+                "exec", pod, "-n", ns] + container_args + [
+                "--", "rocminfo"
+            ]
+            try:
+                r = subprocess.run(rocminfo_cmd, capture_output=True, text=True, timeout=30)
+                if r.returncode == 0:
+                    output = r.stdout
+                    gpu_count = output.count("Marketing Name")
+                    agent_count = output.count("Agent")
+                    entry["rocminfo"] = {
+                        "success": True,
+                        "gpu_count": gpu_count,
+                        "agents": agent_count,
+                        "snippet": output[:500],
+                    }
+                else:
+                    entry["rocminfo"] = {"success": False, "error": r.stderr.strip()[:200]}
+            except subprocess.TimeoutExpired:
+                entry["rocminfo"] = {"success": False, "error": "timeout"}
+
+            # Run rocm-smi
+            smi_cmd = ["kubectl"] + context_args + [
+                "exec", pod, "-n", ns] + container_args + [
+                "--", "rocm-smi"
+            ]
+            try:
+                r = subprocess.run(smi_cmd, capture_output=True, text=True, timeout=15)
+                if r.returncode == 0:
+                    entry["rocm_smi"] = {"success": True, "output": r.stdout.strip()[:1000]}
+                else:
+                    entry["rocm_smi"] = {"success": False, "error": r.stderr.strip()[:200]}
+            except subprocess.TimeoutExpired:
+                entry["rocm_smi"] = {"success": False, "error": "timeout"}
+
+            rocm_ok = entry["rocminfo"] and entry["rocminfo"]["success"]
+            smi_ok = entry["rocm_smi"] and entry["rocm_smi"]["success"]
+            entry["status"] = "pass" if (rocm_ok and smi_ok) else ("partial" if (rocm_ok or smi_ok) else "fail")
+
+        except Exception as e:
+            entry["error"] = str(e)
+            entry["status"] = "fail"
+
+        results.append(entry)
+    return results
+
+
 class DrainHandler(BaseHTTPRequestHandler):
     context_args = []
     cached_namespaces = None
@@ -147,6 +227,20 @@ class DrainHandler(BaseHTTPRequestHandler):
         if self.path == "/refresh-ns":
             DrainHandler.cached_namespaces = get_namespaces(DrainHandler.context_args)
             self._json_response({"namespaces": DrainHandler.cached_namespaces, "refreshed": True})
+            return
+
+        if self.path.startswith("/verify"):
+            ns_filter = self._param("ns")
+            if ns_filter:
+                ns_list = [n.strip() for n in ns_filter.split(",")]
+            else:
+                ns_list = DrainHandler.cached_namespaces or get_namespaces(DrainHandler.context_args)
+
+            results = verify_gpu(DrainHandler.context_args, ns_list)
+            self._json_response({
+                "cluster": self._get_context_name(),
+                "results": results,
+            })
             return
 
         self._json_response({"error": "Not found"}, 404)
@@ -211,6 +305,7 @@ def main():
     print(f"  Endpoints:")
     print(f"    GET /pods          - pod counts per namespace")
     print(f"    GET /pods?ns=X,Y   - filter to specific namespaces")
+    print(f"    GET /verify?ns=X,Y - GPU smoke test (rocminfo + rocm-smi)")
     print(f"    GET /namespaces    - list namespaces")
     print(f"    GET /health        - health check")
     print(f"\n  Open the migration dashboard in your browser.")

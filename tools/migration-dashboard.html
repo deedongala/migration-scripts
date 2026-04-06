@@ -594,6 +594,20 @@
   </div>
 
   <div class="card">
+    <h2>GPU Verification</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">
+      Post-migration smoke test: picks a running pod per namespace and runs <code>rocminfo</code> + <code>rocm-smi</code> to verify GPUs are accessible.
+      Requires the drain server to be running.
+    </p>
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+      <button class="btn btn-secondary" onclick="runGpuVerify(false)">Verify Selected Tenants</button>
+      <button class="btn btn-secondary" onclick="runGpuVerify(true)">Verify All Namespaces</button>
+      <span id="verifySpinner" style="display:none;"><span class="spinner"></span> Running checks...</span>
+    </div>
+    <div id="verifyResults"></div>
+  </div>
+
+  <div class="card">
     <h2>Recent Runs</h2>
     <div class="history" id="history">
       <div style="color: var(--text-dim); font-size: 13px; padding: 12px 0;">
@@ -1353,6 +1367,102 @@ function renderRunnerSets(data, container) {
         <tbody>${rows.join('')}</tbody>
       </table>
     </details>`;
+}
+
+async function runGpuVerify(all) {
+  const serverUrl = document.getElementById('drainServerUrl').value.replace(/\/+$/, '');
+  const spinner = document.getElementById('verifySpinner');
+  const container = document.getElementById('verifyResults');
+
+  let url = `${serverUrl}/verify`;
+  if (!all && selectedTenants.size > 0) {
+    const allNs = [];
+    selectedTenants.forEach(t => {
+      TENANT_DATA[t].ns.split(',').forEach(n => allNs.push(n.trim()));
+    });
+    url += `?ns=${allNs.join(',')}`;
+  }
+
+  spinner.style.display = 'inline-flex';
+  container.innerHTML = '';
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    spinner.style.display = 'none';
+    renderVerifyResults(data, container);
+  } catch (e) {
+    spinner.style.display = 'none';
+    container.innerHTML = `<div style="color: var(--red); padding: 8px;">Cannot connect to drain server: ${e.message}</div>`;
+  }
+}
+
+function renderVerifyResults(data, container) {
+  const results = data.results || [];
+  if (results.length === 0) {
+    container.innerHTML = '<div class="no-tenants-msg">No namespaces to verify</div>';
+    return;
+  }
+
+  const nsMap = {};
+  Object.entries(TENANT_DATA).forEach(([key, d]) => {
+    d.ns.split(',').forEach(n => { nsMap[n.trim()] = d.label; });
+  });
+
+  const allPass = results.every(r => r.status === 'pass');
+  const anyFail = results.some(r => r.status === 'fail');
+  const banner = allPass
+    ? `<div class="drain-safe-banner safe">&#10003; All GPUs verified — rocminfo and rocm-smi passed on ${results.length} namespace(s)</div>`
+    : anyFail
+      ? `<div class="drain-safe-banner waiting">&#9888; GPU issues detected — check results below</div>`
+      : `<div class="drain-safe-banner waiting">&#9888; Partial results — some checks could not run</div>`;
+
+  const rows = results.map(r => {
+    const tenant = nsMap[r.namespace] || '-';
+    const statusColor = r.status === 'pass' ? 'var(--green)' : r.status === 'partial' ? 'var(--yellow)' : r.status === 'skip' ? 'var(--text-dim)' : 'var(--red)';
+    const statusText = r.status === 'pass' ? 'PASS' : r.status === 'partial' ? 'PARTIAL' : r.status === 'skip' ? 'SKIP' : 'FAIL';
+    const badgeClass = r.status === 'pass' ? 'clear' : 'running';
+
+    const rocmInfo = r.rocminfo
+      ? (r.rocminfo.success ? `<span style="color:var(--green);">&#10003;</span> ${r.rocminfo.gpu_count} GPU(s)` : `<span style="color:var(--red);">&#10007;</span> ${r.rocminfo.error || 'failed'}`)
+      : '<span style="color:var(--text-dim);">-</span>';
+
+    const rocmSmi = r.rocm_smi
+      ? (r.rocm_smi.success ? `<span style="color:var(--green);">&#10003;</span> OK` : `<span style="color:var(--red);">&#10007;</span> ${r.rocm_smi.error || 'failed'}`)
+      : '<span style="color:var(--text-dim);">-</span>';
+
+    const podInfo = r.pod ? `<code style="font-size:11px;">${r.pod.substring(0, 40)}${r.pod.length > 40 ? '...' : ''}</code>` : (r.error || 'no pod');
+
+    const detailId = `verify-detail-${r.namespace.replace(/[^a-z0-9]/g, '-')}`;
+    const hasOutput = r.rocm_smi?.output || r.rocminfo?.snippet;
+    const detailBtn = hasOutput ? `<button onclick="document.getElementById('${detailId}').style.display=document.getElementById('${detailId}').style.display==='none'?'block':'none'" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;">details</button>` : '';
+
+    const detailRow = hasOutput ? `<tr id="${detailId}" style="display:none;"><td colspan="6"><pre style="background:var(--bg);padding:8px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;">${(r.rocm_smi?.output || r.rocminfo?.snippet || '').replace(/</g, '&lt;')}</pre></td></tr>` : '';
+
+    return `<tr>
+      <td><strong>${tenant}</strong></td>
+      <td><code>${r.namespace}</code></td>
+      <td style="font-size:11px;">${podInfo}</td>
+      <td>${rocmInfo}</td>
+      <td>${rocmSmi} ${detailBtn}</td>
+      <td><span class="drain-badge ${badgeClass}" style="color:${statusColor};">${statusText}</span></td>
+    </tr>${detailRow}`;
+  });
+
+  container.innerHTML = `
+    ${banner}
+    <table class="drain-table" style="margin-top: 12px;">
+      <thead><tr>
+        <th>Tenant</th>
+        <th>Namespace</th>
+        <th>Pod</th>
+        <th>rocminfo</th>
+        <th>rocm-smi</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>`;
 }
 
 function toggleAutoRefresh() {
