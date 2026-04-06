@@ -267,6 +267,52 @@
   .label-shadow { color: var(--text-dim); font-family: monospace; font-size: 11px; }
   .no-tenants-msg { color: var(--text-dim); padding: 16px 0; text-align: center; }
 
+  .drain-section { display: flex; flex-direction: column; gap: 16px; }
+  .drain-cluster-select { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .drain-cmd-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px; font-family: monospace; font-size: 12px; line-height: 1.5;
+    white-space: pre-wrap; position: relative; color: var(--text);
+  }
+  .drain-cmd-box .copy-btn {
+    position: absolute; top: 8px; right: 8px; background: var(--card);
+    border: 1px solid var(--border); color: var(--text-dim); padding: 4px 10px;
+    border-radius: 4px; font-size: 11px; cursor: pointer;
+  }
+  .drain-cmd-box .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .drain-output-area {
+    width: 100%; min-height: 80px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px;
+    color: var(--text); resize: vertical;
+  }
+  .drain-output-area:focus { outline: none; border-color: var(--accent); }
+  .drain-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .drain-table th {
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+    color: var(--text-dim); font-weight: 500; font-size: 12px;
+  }
+  .drain-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .drain-table tr:last-child td { border-bottom: none; }
+  .drain-bar-bg {
+    height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; min-width: 120px;
+  }
+  .drain-bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.3s;
+  }
+  .drain-bar-fill.active { background: var(--yellow); }
+  .drain-bar-fill.drained { background: var(--green); }
+  .drain-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+  }
+  .drain-badge.running { background: #2e1e00; color: var(--yellow); }
+  .drain-badge.clear { background: #0d2818; color: var(--green); }
+  .drain-safe-banner {
+    padding: 12px 16px; border-radius: 6px; font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .drain-safe-banner.safe { background: #0d2818; border: 1px solid #238636; color: var(--green); }
+  .drain-safe-banner.waiting { background: #2e1e00; border: 1px solid #d29922; color: var(--yellow); }
+
   .summary {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -507,6 +553,42 @@
   </div>
 
   <div class="card">
+    <h2>Drain Monitor</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">
+      Track active runner pods while draining (min/max=0). Copy the script, run it in your terminal, and paste the output below.
+    </p>
+    <div class="drain-section">
+      <div class="drain-cluster-select">
+        <label style="font-size: 13px; color: var(--text-dim);">Cluster to drain:</label>
+        <select id="drainCluster" onchange="renderDrainCommand()" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; color: var(--text); font-size: 13px;">
+          <option value="prod-vultr-mi325">prod-vultr-mi325</option>
+          <option value="tw-mia1-mi355-public">tw-mia1-mi355-public</option>
+          <option value="do-atl1-vm-public">do-atl1-vm-public</option>
+          <option value="ccs-aus-bm-pvt-prd">ccs-aus-bm-pvt-prd</option>
+          <option value="vultr-ord-bm-public2">vultr-ord-bm-public2</option>
+          <option value="aks-saiscale-linux">aks-saiscale-linux</option>
+        </select>
+        <button class="btn btn-secondary" onclick="renderDrainCommand()" style="padding: 6px 14px; font-size: 12px;">Refresh Script</button>
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block;">1. Copy &amp; run this in your terminal:</label>
+        <div class="drain-cmd-box" id="drainCmdBox">
+          <button class="copy-btn" onclick="copyDrainCmd()">Copy</button>
+          <span id="drainCmdText">Select tenants above to generate drain check script</span>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block;">2. Paste the output here:</label>
+        <textarea class="drain-output-area" id="drainOutput" placeholder="Paste kubectl output here..." oninput="parseDrainOutput()"></textarea>
+      </div>
+
+      <div id="drainResults"></div>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Recent Runs</h2>
     <div class="history" id="history">
       <div style="color: var(--text-dim); font-size: 13px; padding: 12px 0;">
@@ -618,6 +700,7 @@ function onTenantSelectionChange() {
   info.classList.add('visible');
 
   renderMigrationLabels();
+  renderDrainCommand();
   updateSummary();
 }
 
@@ -956,6 +1039,140 @@ function renderRunnerLabels() {
   body.innerHTML = rows.join('');
 }
 
+function getDrainNamespaces() {
+  const cluster = document.getElementById('drainCluster').value;
+  const nsList = [];
+  if (selectedTenants.size > 0) {
+    selectedTenants.forEach(t => {
+      const d = TENANT_DATA[t];
+      if (d.clusters.includes(cluster)) {
+        d.ns.split(',').forEach(n => nsList.push(n.trim()));
+      }
+    });
+  }
+  if (nsList.length === 0) {
+    Object.values(TENANT_DATA).forEach(d => {
+      if (d.clusters.includes(cluster)) {
+        d.ns.split(',').forEach(n => nsList.push(n.trim()));
+      }
+    });
+  }
+  return [...new Set(nsList)];
+}
+
+function renderDrainCommand() {
+  const cluster = document.getElementById('drainCluster').value;
+  const namespaces = getDrainNamespaces();
+  if (namespaces.length === 0) {
+    document.getElementById('drainCmdText').textContent = `# No namespaces found for cluster: ${cluster}`;
+    return;
+  }
+
+  const nsList = namespaces.map(n => `"${n}"`).join(' ');
+  const cmd = `# Drain check for ${cluster}
+# Run this in your terminal (kubectl context must be set to ${cluster})
+echo "DRAIN_START"
+for ns in ${nsList}; do
+  total=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  running=$(kubectl get pods -n "$ns" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  pending=$(kubectl get pods -n "$ns" --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  terminating=$(kubectl get pods -n "$ns" 2>/dev/null | grep Terminating | wc -l | tr -d ' ')
+  echo "NS:$ns|TOTAL:$total|RUNNING:$running|PENDING:$pending|TERMINATING:$terminating"
+done
+echo "DRAIN_END"`;
+
+  document.getElementById('drainCmdText').textContent = cmd;
+}
+
+function copyDrainCmd() {
+  const text = document.getElementById('drainCmdText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('#drainCmdBox .copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function parseDrainOutput() {
+  const raw = document.getElementById('drainOutput').value.trim();
+  const container = document.getElementById('drainResults');
+
+  if (!raw || !raw.includes('DRAIN_START')) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const lines = raw.split('\n').filter(l => l.startsWith('NS:'));
+  if (lines.length === 0) {
+    container.innerHTML = '<div style="color: var(--text-dim); padding: 8px 0;">No namespace data found. Make sure you pasted the full output.</div>';
+    return;
+  }
+
+  const nsMap = {};
+  Object.entries(TENANT_DATA).forEach(([key, d]) => {
+    d.ns.split(',').forEach(n => { nsMap[n.trim()] = d.label; });
+  });
+
+  let totalPods = 0;
+  let allClear = true;
+  const rows = lines.map(line => {
+    const parts = {};
+    line.split('|').forEach(p => {
+      const [k, v] = p.split(':');
+      parts[k] = v;
+    });
+    const ns = parts['NS'] || '?';
+    const total = parseInt(parts['TOTAL'] || '0');
+    const running = parseInt(parts['RUNNING'] || '0');
+    const pending = parseInt(parts['PENDING'] || '0');
+    const terminating = parseInt(parts['TERMINATING'] || '0');
+    const active = running + pending + terminating;
+    totalPods += active;
+    if (active > 0) allClear = false;
+
+    const tenant = nsMap[ns] || '-';
+    const maxBar = Math.max(active, 1);
+    const pct = active > 0 ? 100 : 0;
+    const barClass = active === 0 ? 'drained' : 'active';
+    const badgeClass = active === 0 ? 'clear' : 'running';
+    const badgeText = active === 0 ? 'Drained' : `${active} active`;
+
+    return `<tr>
+      <td><strong>${tenant}</strong></td>
+      <td><code>${ns}</code></td>
+      <td style="text-align: center;">${running}</td>
+      <td style="text-align: center;">${pending}</td>
+      <td style="text-align: center;">${terminating}</td>
+      <td>
+        <div class="drain-bar-bg"><div class="drain-bar-fill ${barClass}" style="width: ${pct}%"></div></div>
+      </td>
+      <td><span class="drain-badge ${badgeClass}">${badgeText}</span></td>
+    </tr>`;
+  });
+
+  const banner = allClear
+    ? `<div class="drain-safe-banner safe">&#10003; All namespaces drained — safe to proceed with migration</div>`
+    : `<div class="drain-safe-banner waiting">&#9888; ${totalPods} pod(s) still active — waiting for drain to complete</div>`;
+
+  container.innerHTML = `
+    ${banner}
+    <table class="drain-table" style="margin-top: 12px;">
+      <thead><tr>
+        <th>Tenant</th>
+        <th>Namespace</th>
+        <th style="text-align:center;">Running</th>
+        <th style="text-align:center;">Pending</th>
+        <th style="text-align:center;">Terminating</th>
+        <th>Progress</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <p style="color: var(--text-dim); font-size: 11px; margin-top: 8px;">
+      Re-run the script and paste new output to refresh. All pods must reach 0 before proceeding.
+    </p>`;
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const savedToken = localStorage.getItem('gh_token');
   const savedRepo = localStorage.getItem('gh_repo');
@@ -970,6 +1187,7 @@ window.addEventListener('DOMContentLoaded', () => {
   renderTenantGrid();
   renderClusterMap();
   renderRunnerLabels();
+  renderDrainCommand();
   updateSummary();
   saveRepo();
 });
