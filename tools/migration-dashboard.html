@@ -250,6 +250,23 @@
   .batch-status.done { background: #0d2818; color: var(--green); }
   .batch-status.failed { background: #2d1215; color: var(--red); }
 
+  .label-edit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .label-edit-table th {
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+    color: var(--text-dim); font-weight: 500; font-size: 12px;
+  }
+  .label-edit-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .label-edit-table tr:last-child td { border-bottom: none; }
+  .label-edit-input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 10px; color: var(--text); font-family: monospace; font-size: 12px; width: 100%;
+  }
+  .label-edit-input:focus { outline: none; border-color: var(--accent); }
+  .label-edit-input.modified { border-color: var(--yellow); background: #2e1e0033; }
+  .label-arrow { color: var(--text-dim); font-size: 16px; text-align: center; }
+  .label-shadow { color: var(--text-dim); font-family: monospace; font-size: 11px; }
+  .no-tenants-msg { color: var(--text-dim); padding: 16px 0; text-align: center; }
+
   .summary {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -449,7 +466,13 @@
   </div>
 
   <div class="card">
-    <h2><span class="step">4</span> Review & Execute</h2>
+    <h2><span class="step">4</span> Runner Labels for Migration</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 12px;">These are the <code>runs-on</code> labels that will be created on the destination cluster. Edit to customize.</p>
+    <div id="migrationLabels"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">5</span> Review & Execute</h2>
     <div class="summary" id="summary"></div>
     <div id="batchPreview"></div>
     <div class="actions">
@@ -567,11 +590,14 @@ function renderTenantGrid() {
   }).join('');
 }
 
+let customLabels = {};
+
 function onTenantSelectionChange() {
   const info = document.getElementById('tenantInfo');
   if (selectedTenants.size === 0) {
     info.classList.remove('visible');
     document.getElementById('namespaces').value = '';
+    renderMigrationLabels();
     updateSummary();
     return;
   }
@@ -590,6 +616,77 @@ function onTenantSelectionChange() {
   info.innerHTML = `<strong>Selected:</strong> ${selectedTenants.size} tenant(s) &nbsp; <strong>Namespaces:</strong> ${allNs.length} &nbsp; <strong>AD Groups:</strong> ${[...new Set(allGroups)].join(', ') || 'none'}`;
   info.classList.add('visible');
 
+  renderMigrationLabels();
+  updateSummary();
+}
+
+function renderMigrationLabels() {
+  const container = document.getElementById('migrationLabels');
+  const dest = document.getElementById('destCluster').value;
+  const src = document.getElementById('sourceCluster').value;
+
+  if (selectedTenants.size === 0) {
+    container.innerHTML = '<div class="no-tenants-msg">Select tenants to see their runner labels</div>';
+    return;
+  }
+
+  const isShadow = selectedPhase === 'shadow';
+  let rows = '';
+
+  [...selectedTenants].forEach(t => {
+    const d = TENANT_DATA[t];
+    const srcLabel = d.runLabels?.[src] || '-';
+    const defaultDestLabel = d.runLabels?.[dest] || srcLabel;
+    const customKey = `${t}-${dest}`;
+    const currentLabel = customLabels[customKey] || defaultDestLabel;
+    const shadowLabel = isShadow ? currentLabel + '.test' : currentLabel;
+
+    rows += `<tr>
+      <td><strong>${d.label}</strong></td>
+      <td><span class="label-tag">${srcLabel}</span></td>
+      <td class="label-arrow">&rarr;</td>
+      <td>
+        <input type="text" class="label-edit-input ${customLabels[customKey] ? 'modified' : ''}"
+          value="${currentLabel}"
+          data-tenant="${t}" data-default="${defaultDestLabel}"
+          oninput="onLabelEdit(this, '${customKey}', '${defaultDestLabel}')"
+          placeholder="${defaultDestLabel}">
+        ${isShadow ? `<div class="label-shadow">Shadow: ${shadowLabel}</div>` : ''}
+      </td>
+      <td style="width:40px;">
+        ${customLabels[customKey] ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultDestLabel}')" title="Reset to default">&times;</button>` : ''}
+      </td>
+    </tr>`;
+  });
+
+  container.innerHTML = `<table class="label-edit-table">
+    <thead><tr>
+      <th>Tenant</th>
+      <th>Source Label (${src})</th>
+      <th></th>
+      <th>Destination Label (${dest})${isShadow ? ' + .test suffix' : ''}</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function onLabelEdit(input, customKey, defaultLabel) {
+  const val = input.value.trim();
+  if (val && val !== defaultLabel) {
+    customLabels[customKey] = val;
+    input.classList.add('modified');
+  } else {
+    delete customLabels[customKey];
+    input.classList.remove('modified');
+  }
+  renderMigrationLabels();
+  updateSummary();
+}
+
+function resetLabel(customKey, defaultLabel) {
+  delete customLabels[customKey];
+  renderMigrationLabels();
   updateSummary();
 }
 
@@ -603,6 +700,14 @@ function updateSummary() {
   const rbac = document.getElementById('includeRbac').checked ? 'Yes' : 'No';
   const dry = document.getElementById('dryRun').checked ? 'Yes' : 'No';
 
+  const labelLines = [...selectedTenants].map(t => {
+    const d = TENANT_DATA[t];
+    const customKey = `${t}-${dest}`;
+    const label = customLabels[customKey] || d.runLabels?.[dest] || d.runLabels?.[src] || '?';
+    const suffix = selectedPhase === 'shadow' ? '.test' : '';
+    return `  ${d.label.padEnd(16)} ${label}${suffix}`;
+  }).join('\n');
+
   s.textContent =
 `Phase:        ${selectedPhase}
 Tenants:      ${tenants} (${selectedTenants.size})
@@ -611,7 +716,8 @@ Destination:  ${dest}
 Namespaces:   ${ns}
 Max Runners:  ${maxR}
 RBAC:         ${rbac}
-Dry-run:      ${dry}`;
+Dry-run:      ${dry}
+${selectedTenants.size > 0 ? '\nRunner Labels:\n' + labelLines : ''}`;
 
   const preview = document.getElementById('batchPreview');
   if (selectedTenants.size > 1) {
@@ -743,11 +849,14 @@ function exportPlan() {
   md += `**Source:** \`${src}\`\n`;
   md += `**Destination:** \`${dest}\`\n\n`;
   md += `## Tenants\n\n`;
-  md += `| Tenant | Namespaces | AD Group | Status |\n`;
-  md += `|---|---|---|---|\n`;
+  md += `| Tenant | Runner Label | Namespaces | AD Group | Status |\n`;
+  md += `|---|---|---|---|---|\n`;
   tenants.forEach(t => {
     const d = TENANT_DATA[t];
-    md += `| ${d.label} | \`${d.ns}\` | \`${d.group || 'none'}\` | Pending |\n`;
+    const customKey = `${t}-${dest}`;
+    const label = customLabels[customKey] || d.runLabels?.[dest] || d.runLabels?.[src] || '?';
+    const suffix = selectedPhase === 'shadow' ? '.test' : '';
+    md += `| ${d.label} | \`${label}${suffix}\` | \`${d.ns}\` | \`${d.group || 'none'}\` | Pending |\n`;
   });
   md += `\n## Checklist\n\n`;
   md += `- [ ] Shadow runners deployed\n`;
@@ -853,7 +962,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (savedRepo) document.getElementById('ghRepo').value = savedRepo;
 
   document.querySelectorAll('select, input').forEach(el => {
-    el.addEventListener('change', updateSummary);
+    el.addEventListener('change', () => { renderMigrationLabels(); updateSummary(); });
     el.addEventListener('input', updateSummary);
   });
 
