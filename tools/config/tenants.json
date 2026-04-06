@@ -16,20 +16,126 @@
     "aws-stg-usea1": { "label": "AWS Staging", "gpu": "Infra", "alertClusterName": null }
   },
   "tenants": {
-    "rocm": {
-      "label": "ROCm",
-      "group": "AIG-TheRock-OSSCI-Infra",
-      "namespaces": ["arc-rocm"],
+    "aims": {
+      "label": "AIMS",
+      "group": "aimsdevgroup",
+      "namespaces": ["aims-dev"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": []
+        }
+      }
+    },
+    "aiter": {
+      "label": "AIter",
+      "group": "",
+      "namespaces": ["arc-aiter"],
       "clusters": {
         "prod-vultr-mi325": {
           "runners": [
-            { "key": "rocm-gfx942-1gpu-runner", "namespace": "arc-rocm", "label": "linux-gfx942-1gpu-ossci-rocm" }
+            { "key": "aiter-1gpu-runner", "namespace": "arc-aiter", "label": "aiter-1gpu-runner" },
+            { "key": "aiter-4gpu-runner", "namespace": "arc-aiter", "label": "aiter-4gpu-runner" },
+            { "key": "aiter-8gpu-runner", "namespace": "arc-aiter", "label": "aiter-8gpu-runner" }
+          ]
+        }
+      }
+    },
+    "hf": {
+      "label": "HuggingFace",
+      "group": "dl-automation",
+      "namespaces": ["arc-hf"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "huggingface-mi325-1gpu-runner", "namespace": "arc-hf", "label": "amd-mi325-ci-1gpu" },
+            { "key": "huggingface-mi325-2gpu-runner", "namespace": "arc-hf", "label": "amd-mi325-ci-2gpu" }
+          ]
+        }
+      }
+    },
+    "iree": {
+      "label": "IREE",
+      "group": "iree-dev",
+      "namespaces": ["iree-dev", "arc-iree-mi325-gpu-1", "arc-iree-mi325-gpu-2", "arc-iree"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "iree-mi325-1gpu-runner", "namespace": "arc-iree-mi325-gpu-1", "label": "linux-mi325-1gpu-ossci-iree-org" },
+            { "key": "iree-mi325-2gpu-runner", "namespace": "arc-iree-mi325-gpu-2", "label": "linux-mi325-2gpu-ossci-iree-org" }
           ]
         },
-        "ccs-aus-bm-pvt-prd": {
+        "do-atl1-vm-public": {
           "runners": [
-            { "key": "rocm-mi300-8gpu-runner", "namespace": "arc-rocm", "label": "linux-gfx942-8gpu-ossci-rocm" },
-            { "key": "rocm-mi300-8gpu-sandbox-runner", "namespace": "arc-rocm", "label": "linux-gfx942-8gpu-sandbox-ossci-rocm" }
+            { "key": "iree-mi35x-1gpu-runner", "namespace": "arc-iree", "label": "linux-mi35x-1gpu-ossci-iree-org" }
+          ]
+        }
+      }
+    },
+    "jax": {
+      "label": "JAX / XLA",
+      "group": "dl.sec-JAX",
+      "namespaces": ["arc-jax", "arc-rocm-jax", "arc-xla", "jax-framework-dev"],
+      "clusters": {
+        "do-atl1-vm-public": {
+          "runners": [
+            { "key": "jax-mi325-1gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-1gpu-amd" },
+            { "key": "jax-mi325-4gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-4gpu-amd" },
+            { "key": "jax-mi325-8gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-8gpu-amd" },
+            { "key": "rocm-jax-mi325-1gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-1gpu-amd" },
+            { "key": "rocm-jax-mi325-4gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-4gpu-amd" },
+            { "key": "rocm-jax-mi325-8gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-8gpu-amd" },
+            { "key": "xla-mi325-1gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-1gpu-amd" },
+            { "key": "xla-mi325-4gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-4gpu-amd" },
+            { "key": "xla-mi325-8gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-8gpu-amd" }
+          ]
+        }
+      }
+    },
+    "llvm": {
+      "label": "LLVM",
+      "group": "",
+      "namespaces": ["arc-llvm"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "llvm-mi325-2gpu-runner", "namespace": "arc-llvm", "label": "arc-llvm-ci-2gpu" }
+          ]
+        }
+      }
+    },
+    "meta-pytorch": {
+      "label": "Meta PyTorch",
+      "group": "",
+      "namespaces": ["arc-meta-pytorch"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "meta-pytorch-mi325-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.1.meta-pytorch" },
+            { "key": "meta-pytorch-mi325-8gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.8.meta-pytorch" }
+          ]
+        },
+        "tw-mia1-mi355-public": {
+          "runners": [
+            { "key": "meta-pytorch-mi355-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "amd-mi350-runner" }
+          ]
+        }
+      }
+    },
+    "nod-ai": {
+      "label": "Nod AI",
+      "group": "",
+      "namespaces": ["arc-nod-ai-mi325-gpu-1", "arc-nod-ai-mi325-gpu-2", "arc-nod-ai-mi325-gpu-8", "arc-nod-ai"],
+      "clusters": {
+        "prod-vultr-mi325": {
+          "runners": [
+            { "key": "nod-ai-mi325-1gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-1", "label": "linux-mi325-1gpu-ossci-nod-ai" },
+            { "key": "nod-ai-mi325-2gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-2", "label": "linux-mi325-2gpu-ossci-nod-ai" },
+            { "key": "nod-ai-mi325-8gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-8", "label": "linux-mi325-8gpu-ossci-nod-ai" }
+          ]
+        },
+        "do-atl1-vm-public": {
+          "runners": [
+            { "key": "nod-ai-mi355-1gpu-runner", "namespace": "arc-nod-ai", "label": "linux-mi355-1gpu-ossci-nod-ai" }
           ]
         }
       }
@@ -57,20 +163,32 @@
         }
       }
     },
-    "meta-pytorch": {
-      "label": "Meta PyTorch",
-      "group": "",
-      "namespaces": ["arc-meta-pytorch"],
+    "rad": {
+      "label": "RAD",
+      "group": "dsg.RAD_CI",
+      "namespaces": ["arc-rad"],
+      "clusters": {
+        "do-atl1-vm-public": {
+          "runners": [
+            { "key": "rad-mi325-8gpu-runner", "namespace": "arc-rad", "label": "linux-mi325-8gpu-ossci-rad" }
+          ]
+        }
+      }
+    },
+    "rocm": {
+      "label": "ROCm",
+      "group": "AIG-TheRock-OSSCI-Infra",
+      "namespaces": ["arc-rocm"],
       "clusters": {
         "prod-vultr-mi325": {
           "runners": [
-            { "key": "meta-pytorch-mi325-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.1.meta-pytorch" },
-            { "key": "meta-pytorch-mi325-8gpu-runner", "namespace": "arc-meta-pytorch", "label": "linux.rocm.gpu.gfx942.8.meta-pytorch" }
+            { "key": "rocm-gfx942-1gpu-runner", "namespace": "arc-rocm", "label": "linux-gfx942-1gpu-ossci-rocm" }
           ]
         },
-        "tw-mia1-mi355-public": {
+        "ccs-aus-bm-pvt-prd": {
           "runners": [
-            { "key": "meta-pytorch-mi355-1gpu-runner", "namespace": "arc-meta-pytorch", "label": "amd-mi350-runner" }
+            { "key": "rocm-mi300-8gpu-runner", "namespace": "arc-rocm", "label": "linux-gfx942-8gpu-ossci-rocm" },
+            { "key": "rocm-mi300-8gpu-sandbox-runner", "namespace": "arc-rocm", "label": "linux-gfx942-8gpu-sandbox-ossci-rocm" }
           ]
         }
       }
@@ -98,106 +216,6 @@
         }
       }
     },
-    "vllm": {
-      "label": "vLLM",
-      "group": "frameworks-devops",
-      "namespaces": ["arc-vllm", "buildkite-vllm"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": []
-        },
-        "tw-mia1-mi355-public": {
-          "runners": []
-        }
-      }
-    },
-    "hf": {
-      "label": "HuggingFace",
-      "group": "dl-automation",
-      "namespaces": ["arc-hf"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": [
-            { "key": "huggingface-mi325-1gpu-runner", "namespace": "arc-hf", "label": "amd-mi325-ci-1gpu" },
-            { "key": "huggingface-mi325-2gpu-runner", "namespace": "arc-hf", "label": "amd-mi325-ci-2gpu" }
-          ]
-        }
-      }
-    },
-    "jax": {
-      "label": "JAX / XLA",
-      "group": "dl.sec-JAX",
-      "namespaces": ["arc-jax", "arc-rocm-jax", "arc-xla", "jax-framework-dev"],
-      "clusters": {
-        "do-atl1-vm-public": {
-          "runners": [
-            { "key": "jax-mi325-1gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-1gpu-amd" },
-            { "key": "jax-mi325-4gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-4gpu-amd" },
-            { "key": "jax-mi325-8gpu-runner", "namespace": "arc-jax", "label": "linux-x86-64-8gpu-amd" },
-            { "key": "rocm-jax-mi325-1gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-1gpu-amd" },
-            { "key": "rocm-jax-mi325-4gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-4gpu-amd" },
-            { "key": "rocm-jax-mi325-8gpu-runner", "namespace": "arc-rocm-jax", "label": "linux-x86-64-8gpu-amd" },
-            { "key": "xla-mi325-1gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-1gpu-amd" },
-            { "key": "xla-mi325-4gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-4gpu-amd" },
-            { "key": "xla-mi325-8gpu-runner", "namespace": "arc-xla", "label": "linux-x86-64-8gpu-amd" }
-          ]
-        }
-      }
-    },
-    "rad": {
-      "label": "RAD",
-      "group": "dsg.RAD_CI",
-      "namespaces": ["arc-rad"],
-      "clusters": {
-        "do-atl1-vm-public": {
-          "runners": [
-            { "key": "rad-mi325-8gpu-runner", "namespace": "arc-rad", "label": "linux-mi325-8gpu-ossci-rad" }
-          ]
-        }
-      }
-    },
-    "iree": {
-      "label": "IREE",
-      "group": "iree-dev",
-      "namespaces": ["iree-dev", "arc-iree-mi325-gpu-1", "arc-iree-mi325-gpu-2", "arc-iree"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": [
-            { "key": "iree-mi325-1gpu-runner", "namespace": "arc-iree-mi325-gpu-1", "label": "linux-mi325-1gpu-ossci-iree-org" },
-            { "key": "iree-mi325-2gpu-runner", "namespace": "arc-iree-mi325-gpu-2", "label": "linux-mi325-2gpu-ossci-iree-org" }
-          ]
-        },
-        "do-atl1-vm-public": {
-          "runners": [
-            { "key": "iree-mi35x-1gpu-runner", "namespace": "arc-iree", "label": "linux-mi35x-1gpu-ossci-iree-org" }
-          ]
-        }
-      }
-    },
-    "aims": {
-      "label": "AIMS",
-      "group": "aimsdevgroup",
-      "namespaces": ["aims-dev"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": []
-        }
-      }
-    },
-    "aiter": {
-      "label": "AIter",
-      "group": "",
-      "namespaces": ["arc-aiter"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": [
-            { "key": "aiter-1gpu-runner", "namespace": "arc-aiter", "label": "aiter-1gpu-runner" },
-            { "key": "aiter-4gpu-runner", "namespace": "arc-aiter", "label": "aiter-4gpu-runner" },
-            { "key": "aiter-8gpu-runner", "namespace": "arc-aiter", "label": "aiter-8gpu-runner" }
-          ]
-        }
-      }
-    },
     "triton": {
       "label": "Triton",
       "group": "",
@@ -216,34 +234,16 @@
         }
       }
     },
-    "nod-ai": {
-      "label": "Nod AI",
-      "group": "",
-      "namespaces": ["arc-nod-ai-mi325-gpu-1", "arc-nod-ai-mi325-gpu-2", "arc-nod-ai-mi325-gpu-8", "arc-nod-ai"],
+    "vllm": {
+      "label": "vLLM",
+      "group": "frameworks-devops",
+      "namespaces": ["arc-vllm", "buildkite-vllm"],
       "clusters": {
         "prod-vultr-mi325": {
-          "runners": [
-            { "key": "nod-ai-mi325-1gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-1", "label": "linux-mi325-1gpu-ossci-nod-ai" },
-            { "key": "nod-ai-mi325-2gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-2", "label": "linux-mi325-2gpu-ossci-nod-ai" },
-            { "key": "nod-ai-mi325-8gpu-runner", "namespace": "arc-nod-ai-mi325-gpu-8", "label": "linux-mi325-8gpu-ossci-nod-ai" }
-          ]
+          "runners": []
         },
-        "do-atl1-vm-public": {
-          "runners": [
-            { "key": "nod-ai-mi355-1gpu-runner", "namespace": "arc-nod-ai", "label": "linux-mi355-1gpu-ossci-nod-ai" }
-          ]
-        }
-      }
-    },
-    "llvm": {
-      "label": "LLVM",
-      "group": "",
-      "namespaces": ["arc-llvm"],
-      "clusters": {
-        "prod-vultr-mi325": {
-          "runners": [
-            { "key": "llvm-mi325-2gpu-runner", "namespace": "arc-llvm", "label": "arc-llvm-ci-2gpu" }
-          ]
+        "tw-mia1-mi355-public": {
+          "runners": []
         }
       }
     }
