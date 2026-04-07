@@ -264,7 +264,7 @@
   .label-edit-input:focus { outline: none; border-color: var(--accent); }
   .label-edit-input.modified { border-color: var(--yellow); background: #2e1e0033; }
   .label-arrow { color: var(--text-dim); font-size: 16px; text-align: center; }
-  .label-shadow { color: var(--text-dim); font-family: monospace; font-size: 11px; }
+  .label-shadow { color: var(--yellow); font-family: monospace; font-size: 11px; margin-top: 4px; }
   .no-tenants-msg { color: var(--text-dim); padding: 16px 0; text-align: center; }
 
   .drain-section { display: flex; flex-direction: column; gap: 16px; }
@@ -1060,7 +1060,7 @@ function renderMigrationLabels() {
             oninput="onLabelEdit(this, '${customKey}', '${defaultDestLabel}')"
             placeholder="${defaultDestLabel}"
             ${isSelected ? '' : 'disabled'}>
-          ${isShadow && isSelected ? `<div class="label-shadow">Shadow: ${shadowLabel}</div>` : ''}
+          ${isShadow && isSelected ? `<div class="label-shadow">Deployed as: <strong>${shadowLabel}</strong></div>` : ''}
         </td>
         <td style="width:30px;">
           ${customLabels[customKey] ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultDestLabel}')" title="Reset">&times;</button>` : ''}
