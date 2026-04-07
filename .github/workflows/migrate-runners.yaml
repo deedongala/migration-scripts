@@ -137,9 +137,8 @@ jobs:
         run: |
           SRC="${{ github.event.inputs.source_cluster }}"
           DEST="${{ github.event.inputs.destination_cluster }}"
-          if [[ "$SRC" == "$DEST" ]]; then
-            echo "::error::Source and destination clusters cannot be the same"
-            exit 1
+          if [[ "$SRC" == "$DEST" && "${{ github.event.inputs.phase }}" == "shadow" ]]; then
+            echo "::warning::Source and destination are the same cluster (allowed for promote/drain/delete)"
           fi
           if [[ ! -d "clusters/$SRC" ]]; then
             echo "::error::Source cluster directory not found: clusters/$SRC"
