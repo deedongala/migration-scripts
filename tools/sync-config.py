@@ -190,10 +190,14 @@ def scan_local(repo_path):
             if name not in t["clusters"]:
                 t["clusters"][name] = {"runners": []}
 
+            base_label = r["label"]
+            if base_label.endswith(".test"):
+                base_label = base_label[:-5]
+
             t["clusters"][name]["runners"].append({
                 "key": r["key"],
                 "namespace": ns,
-                "label": r["label"],
+                "label": base_label,
             })
 
     # Sort tenants alphabetically
@@ -279,10 +283,14 @@ def scan_github(repo, token):
             if name not in t["clusters"]:
                 t["clusters"][name] = {"runners": []}
 
+            base_label = r["label"]
+            if base_label.endswith(".test"):
+                base_label = base_label[:-5]
+
             t["clusters"][name]["runners"].append({
                 "key": r["key"],
                 "namespace": ns,
-                "label": r["label"],
+                "label": base_label,
             })
 
     config["tenants"] = dict(sorted(config["tenants"].items()))

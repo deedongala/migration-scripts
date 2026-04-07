@@ -696,18 +696,108 @@ const FALLBACK_CONFIG = {
   },
   tenants: {
     aims: { label: "AIMS", group: "aimsdevgroup", namespaces: ["aims-dev"], clusters: { "prod-vultr-mi325": { runners: [] } } },
-    aiter: { label: "AIter", group: "", namespaces: ["arc-aiter"], clusters: { "prod-vultr-mi325": { runners: [{ key: "aiter-1gpu-runner", namespace: "arc-aiter", label: "aiter-1gpu-runner" }] } } },
-    hf: { label: "HuggingFace", group: "dl-automation", namespaces: ["arc-hf"], clusters: { "prod-vultr-mi325": { runners: [{ key: "huggingface-mi325-1gpu-runner", namespace: "arc-hf", label: "amd-mi325-ci-1gpu" }] } } },
-    iree: { label: "IREE", group: "iree-dev", namespaces: ["iree-dev","arc-iree-mi325-gpu-1","arc-iree-mi325-gpu-2","arc-iree"], clusters: { "prod-vultr-mi325": { runners: [{ key: "iree-mi325-1gpu-runner", namespace: "arc-iree-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-iree-org" }] }, "do-atl1-vm-public": { runners: [{ key: "iree-mi35x-1gpu-runner", namespace: "arc-iree", label: "linux-mi35x-1gpu-ossci-iree-org" }] } } },
-    jax: { label: "JAX / XLA", group: "dl.sec-JAX", namespaces: ["arc-jax","arc-rocm-jax","arc-xla","jax-framework-dev"], clusters: { "do-atl1-vm-public": { runners: [{ key: "jax-mi325-1gpu-runner", namespace: "arc-jax", label: "linux-x86-64-1gpu-amd" }] } } },
-    llvm: { label: "LLVM", group: "", namespaces: ["arc-llvm"], clusters: { "prod-vultr-mi325": { runners: [{ key: "llvm-mi325-2gpu-runner", namespace: "arc-llvm", label: "arc-llvm-ci-2gpu" }] } } },
-    "meta-pytorch": { label: "Meta PyTorch", group: "", namespaces: ["arc-meta-pytorch"], clusters: { "prod-vultr-mi325": { runners: [{ key: "meta-pytorch-mi325-1gpu-runner", namespace: "arc-meta-pytorch", label: "linux.rocm.gpu.gfx942.1.meta-pytorch" }] }, "tw-mia1-mi355-public": { runners: [{ key: "meta-pytorch-mi355-1gpu-runner", namespace: "arc-meta-pytorch", label: "amd-mi350-runner" }] } } },
-    "nod-ai": { label: "Nod AI", group: "", namespaces: ["arc-nod-ai-mi325-gpu-1","arc-nod-ai-mi325-gpu-2","arc-nod-ai-mi325-gpu-8","arc-nod-ai"], clusters: { "prod-vultr-mi325": { runners: [{ key: "nod-ai-mi325-1gpu-runner", namespace: "arc-nod-ai-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-nod-ai" }] }, "do-atl1-vm-public": { runners: [{ key: "nod-ai-mi355-1gpu-runner", namespace: "arc-nod-ai", label: "linux-mi355-1gpu-ossci-nod-ai" }] } } },
-    pytorch: { label: "PyTorch", group: "", namespaces: ["arc-pytorch","arc-pytorch-mi325-gpu-1","arc-pytorch-mi325-gpu-2","arc-pytorch-mi325-gpu-4","arc-pytorch-mi325-gpu-8"], clusters: { "prod-vultr-mi325": { runners: [{ key: "pytorch-mi325-1gpu-runner", namespace: "arc-pytorch-mi325-gpu-1", label: "linux.rocm.gpu.gfx942.1" }] }, "do-atl1-vm-public": { runners: [{ key: "pytorch-mi325-1gpu-runner-no-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.1" }] } } },
-    rad: { label: "RAD", group: "dsg.RAD_CI", namespaces: ["arc-rad"], clusters: { "do-atl1-vm-public": { runners: [{ key: "rad-mi325-8gpu-runner", namespace: "arc-rad", label: "linux-mi325-8gpu-ossci-rad" }] } } },
-    rocm: { label: "ROCm", group: "AIG-TheRock-OSSCI-Infra", namespaces: ["arc-rocm"], clusters: { "prod-vultr-mi325": { runners: [{ key: "rocm-gfx942-1gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-1gpu-ossci-rocm" }] }, "ccs-aus-bm-pvt-prd": { runners: [{ key: "rocm-mi300-8gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-8gpu-ossci-rocm" }] } } },
-    sglang: { label: "SGLang", group: "sglang_ci_runner", namespaces: ["arc-sglang"], clusters: { "prod-vultr-mi325": { runners: [{ key: "sglang-mi325-1gpu-runner", namespace: "arc-sglang", label: "linux-mi325-1gpu-sglang" }] }, "tw-mia1-mi355-public": { runners: [{ key: "sglang-mi35x-1gpu-runner", namespace: "arc-sglang", label: "linux-mi35x-gpu-1" }] } } },
-    triton: { label: "Triton", group: "", namespaces: ["arc-triton-gpu-1","arc-triton-distributed-gpu-8","arc-triton"], clusters: { "prod-vultr-mi325": { runners: [{ key: "triton-mi325-1gpu-runner", namespace: "arc-triton-gpu-1", label: "amd-gfx942" }] }, "tw-mia1-mi355-public": { runners: [{ key: "triton-mi355-1gpu-runner", namespace: "arc-triton", label: "amd-gfx950" }] } } },
+    aiter: { label: "AIter", group: "", namespaces: ["arc-aiter"], clusters: { "prod-vultr-mi325": { runners: [
+      { key: "aiter-1gpu-runner", namespace: "arc-aiter", label: "aiter-1gpu-runner" },
+      { key: "aiter-4gpu-runner", namespace: "arc-aiter", label: "aiter-4gpu-runner" },
+      { key: "aiter-8gpu-runner", namespace: "arc-aiter", label: "aiter-8gpu-runner" }
+    ] } } },
+    hf: { label: "HuggingFace", group: "dl-automation", namespaces: ["arc-hf"], clusters: { "prod-vultr-mi325": { runners: [
+      { key: "huggingface-mi325-1gpu-runner", namespace: "arc-hf", label: "amd-mi325-ci-1gpu" },
+      { key: "huggingface-mi325-2gpu-runner", namespace: "arc-hf", label: "amd-mi325-ci-2gpu" }
+    ] } } },
+    iree: { label: "IREE", group: "iree-dev", namespaces: ["iree-dev","arc-iree-mi325-gpu-1","arc-iree-mi325-gpu-2","arc-iree"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "iree-mi325-1gpu-runner", namespace: "arc-iree-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-iree-org" },
+        { key: "iree-mi325-2gpu-runner", namespace: "arc-iree-mi325-gpu-2", label: "linux-mi325-2gpu-ossci-iree-org" }
+      ] },
+      "do-atl1-vm-public": { runners: [
+        { key: "iree-mi35x-1gpu-runner", namespace: "arc-iree", label: "linux-mi35x-1gpu-ossci-iree-org" }
+      ] }
+    } },
+    jax: { label: "JAX / XLA", group: "dl.sec-JAX", namespaces: ["arc-jax","arc-rocm-jax","arc-xla","jax-framework-dev"], clusters: { "do-atl1-vm-public": { runners: [
+      { key: "jax-mi325-1gpu-runner", namespace: "arc-jax", label: "linux-x86-64-1gpu-amd" },
+      { key: "jax-mi325-4gpu-runner", namespace: "arc-jax", label: "linux-x86-64-4gpu-amd" },
+      { key: "jax-mi325-8gpu-runner", namespace: "arc-jax", label: "linux-x86-64-8gpu-amd" },
+      { key: "rocm-jax-mi325-1gpu-runner", namespace: "arc-rocm-jax", label: "linux-x86-64-1gpu-amd" },
+      { key: "rocm-jax-mi325-4gpu-runner", namespace: "arc-rocm-jax", label: "linux-x86-64-4gpu-amd" },
+      { key: "rocm-jax-mi325-8gpu-runner", namespace: "arc-rocm-jax", label: "linux-x86-64-8gpu-amd" },
+      { key: "xla-mi325-1gpu-runner", namespace: "arc-xla", label: "linux-x86-64-1gpu-amd" },
+      { key: "xla-mi325-4gpu-runner", namespace: "arc-xla", label: "linux-x86-64-4gpu-amd" },
+      { key: "xla-mi325-8gpu-runner", namespace: "arc-xla", label: "linux-x86-64-8gpu-amd" }
+    ] } } },
+    llvm: { label: "LLVM", group: "", namespaces: ["arc-llvm"], clusters: { "prod-vultr-mi325": { runners: [
+      { key: "llvm-mi325-2gpu-runner", namespace: "arc-llvm", label: "arc-llvm-ci-2gpu" }
+    ] } } },
+    "meta-pytorch": { label: "Meta PyTorch", group: "", namespaces: ["arc-meta-pytorch"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "meta-pytorch-mi325-1gpu-runner", namespace: "arc-meta-pytorch", label: "linux.rocm.gpu.gfx942.1.meta-pytorch" },
+        { key: "meta-pytorch-mi325-8gpu-runner", namespace: "arc-meta-pytorch", label: "linux.rocm.gpu.gfx942.8.meta-pytorch" }
+      ] },
+      "tw-mia1-mi355-public": { runners: [
+        { key: "meta-pytorch-mi355-1gpu-runner", namespace: "arc-meta-pytorch", label: "amd-mi350-runner" }
+      ] }
+    } },
+    "nod-ai": { label: "Nod AI", group: "", namespaces: ["arc-nod-ai-mi325-gpu-1","arc-nod-ai-mi325-gpu-2","arc-nod-ai-mi325-gpu-8","arc-nod-ai"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "nod-ai-mi325-1gpu-runner", namespace: "arc-nod-ai-mi325-gpu-1", label: "linux-mi325-1gpu-ossci-nod-ai" },
+        { key: "nod-ai-mi325-2gpu-runner", namespace: "arc-nod-ai-mi325-gpu-2", label: "linux-mi325-2gpu-ossci-nod-ai" },
+        { key: "nod-ai-mi325-8gpu-runner", namespace: "arc-nod-ai-mi325-gpu-8", label: "linux-mi325-8gpu-ossci-nod-ai" }
+      ] },
+      "do-atl1-vm-public": { runners: [
+        { key: "nod-ai-mi355-1gpu-runner", namespace: "arc-nod-ai", label: "linux-mi355-1gpu-ossci-nod-ai" }
+      ] }
+    } },
+    pytorch: { label: "PyTorch", group: "", namespaces: ["arc-pytorch","arc-pytorch-mi325-gpu-1","arc-pytorch-mi325-gpu-2","arc-pytorch-mi325-gpu-4","arc-pytorch-mi325-gpu-8"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "pytorch-mi325-1gpu-runner", namespace: "arc-pytorch-mi325-gpu-1", label: "linux.rocm.gpu.gfx942.1" },
+        { key: "pytorch-mi325-2gpu-runner", namespace: "arc-pytorch-mi325-gpu-2", label: "linux.rocm.gpu.gfx942.2" },
+        { key: "pytorch-mi325-4gpu-runner", namespace: "arc-pytorch-mi325-gpu-4", label: "linux.rocm.gpu.gfx942.4" },
+        { key: "pytorch-mi325-8gpu-runner", namespace: "arc-pytorch-mi325-gpu-8", label: "linux.rocm.gpu.gfx942.8" }
+      ] },
+      "do-atl1-vm-public": { runners: [
+        { key: "pytorch-mi325-1gpu-runner-no-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.1" },
+        { key: "pytorch-mi350-2gpu-runner", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.2" },
+        { key: "pytorch-mi325-4gpu-runner-no-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.4" },
+        { key: "pytorch-mi325-8gpu-runner-no-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.gfx950.8" },
+        { key: "pytorch-ecosystem-1gpu-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.ecosystem.gfx950.1" },
+        { key: "pytorch-ecosystem-8gpu-test", namespace: "arc-pytorch", label: "linux.rocm.gpu.ecosystem.gfx950.8" }
+      ] }
+    } },
+    rad: { label: "RAD", group: "dsg.RAD_CI", namespaces: ["arc-rad"], clusters: { "do-atl1-vm-public": { runners: [
+      { key: "rad-mi325-8gpu-runner", namespace: "arc-rad", label: "linux-mi325-8gpu-ossci-rad" }
+    ] } } },
+    rocm: { label: "ROCm", group: "AIG-TheRock-OSSCI-Infra", namespaces: ["arc-rocm"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "rocm-gfx942-1gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-1gpu-ossci-rocm" }
+      ] },
+      "ccs-aus-bm-pvt-prd": { runners: [
+        { key: "rocm-mi300-8gpu-runner", namespace: "arc-rocm", label: "linux-gfx942-8gpu-ossci-rocm" },
+        { key: "rocm-mi300-8gpu-sandbox-runner", namespace: "arc-rocm", label: "linux-gfx942-8gpu-sandbox-ossci-rocm" }
+      ] }
+    } },
+    sglang: { label: "SGLang", group: "sglang_ci_runner", namespaces: ["arc-sglang"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "sglang-mi325-1gpu-runner", namespace: "arc-sglang", label: "linux-mi325-1gpu-sglang" },
+        { key: "sglang-mi325-2gpu-runner", namespace: "arc-sglang", label: "linux-mi325-2gpu-sglang" },
+        { key: "sglang-mi325-4gpu-runner", namespace: "arc-sglang", label: "linux-mi325-4gpu-sglang" },
+        { key: "sglang-mi325-8gpu-runner", namespace: "arc-sglang", label: "linux-mi325-8gpu-sglang" }
+      ] },
+      "tw-mia1-mi355-public": { runners: [
+        { key: "sglang-mi35x-1gpu-runner", namespace: "arc-sglang", label: "linux-mi35x-gpu-1" },
+        { key: "sglang-mi35x-2gpu-runner", namespace: "arc-sglang", label: "linux-mi35x-gpu-2" },
+        { key: "sglang-mi35x-8gpu-runner", namespace: "arc-sglang", label: "linux-mi35x-gpu-8" },
+        { key: "sglang-mi35x-8gpu-runner-fabric", namespace: "arc-sglang", label: "linux-mi35x-gpu-8.fabric" }
+      ] }
+    } },
+    triton: { label: "Triton", group: "", namespaces: ["arc-triton-gpu-1","arc-triton-distributed-gpu-8","arc-triton"], clusters: {
+      "prod-vultr-mi325": { runners: [
+        { key: "triton-mi325-1gpu-runner", namespace: "arc-triton-gpu-1", label: "amd-gfx942" },
+        { key: "triton-distributed-mi325-8gpu-runner", namespace: "arc-triton-distributed-gpu-8", label: "amd-gfx942-mi325" }
+      ] },
+      "tw-mia1-mi355-public": { runners: [
+        { key: "triton-mi355-1gpu-runner", namespace: "arc-triton", label: "amd-gfx950" }
+      ] }
+    } },
     vllm: { label: "vLLM", group: "frameworks-devops", namespaces: ["arc-vllm","buildkite-vllm"], clusters: { "prod-vultr-mi325": { runners: [] }, "tw-mia1-mi355-public": { runners: [] } } },
   }
 };
@@ -834,6 +924,49 @@ function renderTenantGrid() {
 }
 
 let customLabels = {};
+let selectedRunners = {};  // key: "tenant-runnerKey" → true/false
+
+function getSelectedRunners() {
+  const result = [];
+  const src = document.getElementById('sourceCluster').value;
+  const dest = document.getElementById('destCluster').value;
+  selectedTenants.forEach(t => {
+    const d = TENANT_DATA[t];
+    const allRunners = d.allRunners || {};
+    const srcRunners = allRunners[src]?.runners || [];
+    srcRunners.forEach(r => {
+      const rKey = `${t}-${r.key}`;
+      if (selectedRunners[rKey] !== false) {
+        result.push({ tenant: t, tenantLabel: d.label, ...r });
+      }
+    });
+  });
+  return result;
+}
+
+function toggleRunner(rKey) {
+  selectedRunners[rKey] = selectedRunners[rKey] === false ? true : (selectedRunners[rKey] === true ? false : false);
+  renderMigrationLabels();
+  updateSummary();
+}
+
+function selectAllRunners(tenant) {
+  const src = document.getElementById('sourceCluster').value;
+  const d = TENANT_DATA[tenant];
+  const runners = d.allRunners?.[src]?.runners || [];
+  runners.forEach(r => { selectedRunners[`${tenant}-${r.key}`] = true; });
+  renderMigrationLabels();
+  updateSummary();
+}
+
+function deselectAllRunners(tenant) {
+  const src = document.getElementById('sourceCluster').value;
+  const d = TENANT_DATA[tenant];
+  const runners = d.allRunners?.[src]?.runners || [];
+  runners.forEach(r => { selectedRunners[`${tenant}-${r.key}`] = false; });
+  renderMigrationLabels();
+  updateSummary();
+}
 
 function onTenantSelectionChange() {
   const info = document.getElementById('tenantInfo');
@@ -878,40 +1011,82 @@ function renderMigrationLabels() {
 
   [...selectedTenants].forEach(t => {
     const d = TENANT_DATA[t];
-    const srcLabel = d.runLabels?.[src] || '-';
-    const defaultDestLabel = d.runLabels?.[dest] || srcLabel;
-    const customKey = `${t}-${dest}`;
-    const currentLabel = customLabels[customKey] || defaultDestLabel;
-    const shadowLabel = isShadow ? currentLabel + '.test' : currentLabel;
+    const allRunners = d.allRunners || {};
+    const srcRunners = allRunners[src]?.runners || [];
+    const destRunners = allRunners[dest]?.runners || [];
 
-    rows += `<tr>
-      <td><strong>${d.label}</strong></td>
-      <td><span class="label-tag">${srcLabel}</span></td>
-      <td class="label-arrow">&rarr;</td>
-      <td>
-        <input type="text" class="label-edit-input ${customLabels[customKey] ? 'modified' : ''}"
-          value="${currentLabel}"
-          data-tenant="${t}" data-default="${defaultDestLabel}"
-          oninput="onLabelEdit(this, '${customKey}', '${defaultDestLabel}')"
-          placeholder="${defaultDestLabel}">
-        ${isShadow ? `<div class="label-shadow">Shadow: ${shadowLabel}</div>` : ''}
-      </td>
-      <td style="width:40px;">
-        ${customLabels[customKey] ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultDestLabel}')" title="Reset to default">&times;</button>` : ''}
-      </td>
-    </tr>`;
+    if (srcRunners.length === 0) {
+      rows += `<tr>
+        <td><strong>${d.label}</strong></td>
+        <td colspan="4" style="color: var(--text-dim); font-size: 12px;">No runners on source cluster (${src})</td>
+      </tr>`;
+      return;
+    }
+
+    srcRunners.forEach((r, idx) => {
+      const rKey = `${t}-${r.key}`;
+      const isSelected = selectedRunners[rKey] !== false;
+      const destMatch = destRunners.find(dr => dr.key === r.key) || {};
+      const customKey = `${rKey}-${dest}`;
+      const defaultDestLabel = destMatch.label || r.label;
+      const currentLabel = customLabels[customKey] || defaultDestLabel;
+      const shadowLabel = isShadow ? currentLabel + '.test' : currentLabel;
+      const dimStyle = isSelected ? '' : 'opacity: 0.4;';
+
+      const tenantCell = idx === 0
+        ? `<td rowspan="${srcRunners.length}" style="vertical-align: top;">
+            <strong>${d.label}</strong>
+            <div style="margin-top: 4px; font-size: 11px;">
+              <button onclick="selectAllRunners('${t}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;">all</button>
+              <button onclick="deselectAllRunners('${t}')" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:11px;">none</button>
+            </div>
+          </td>`
+        : '';
+
+      rows += `<tr style="${dimStyle}">
+        ${tenantCell}
+        <td>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRunner('${rKey}')">
+            <span class="label-tag">${r.label}</span>
+          </label>
+          <div style="color:var(--text-dim);font-size:10px;margin-left:22px;">${r.namespace}</div>
+        </td>
+        <td class="label-arrow">&rarr;</td>
+        <td>
+          <input type="text" class="label-edit-input ${customLabels[customKey] ? 'modified' : ''}"
+            value="${currentLabel}"
+            oninput="onLabelEdit(this, '${customKey}', '${defaultDestLabel}')"
+            placeholder="${defaultDestLabel}"
+            ${isSelected ? '' : 'disabled'}>
+          ${isShadow && isSelected ? `<div class="label-shadow">Shadow: ${shadowLabel}</div>` : ''}
+        </td>
+        <td style="width:30px;">
+          ${customLabels[customKey] ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultDestLabel}')" title="Reset">&times;</button>` : ''}
+        </td>
+      </tr>`;
+    });
   });
 
-  container.innerHTML = `<table class="label-edit-table">
-    <thead><tr>
-      <th>Tenant</th>
-      <th>Source Label (${src})</th>
-      <th></th>
-      <th>Destination Label (${dest})${isShadow ? ' + .test suffix' : ''}</th>
-      <th></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const selected = getSelectedRunners();
+  const totalCount = [...selectedTenants].reduce((sum, t) => {
+    return sum + (TENANT_DATA[t].allRunners?.[src]?.runners?.length || 0);
+  }, 0);
+
+  container.innerHTML = `
+    <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 8px;">
+      ${selected.length} of ${totalCount} runner label(s) selected for migration
+    </div>
+    <table class="label-edit-table">
+      <thead><tr>
+        <th>Tenant</th>
+        <th>Source Label (${src})</th>
+        <th></th>
+        <th>Destination Label (${dest})${isShadow ? ' + .test suffix' : ''}</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function onLabelEdit(input, customKey, defaultLabel) {
@@ -923,7 +1098,18 @@ function onLabelEdit(input, customKey, defaultLabel) {
     delete customLabels[customKey];
     input.classList.remove('modified');
   }
-  renderMigrationLabels();
+  const isShadow = selectedPhase === 'shadow';
+  const shadowEl = input.parentElement.querySelector('.label-shadow');
+  if (shadowEl) {
+    const current = input.value.trim() || defaultLabel;
+    shadowEl.textContent = 'Shadow: ' + current + '.test';
+  }
+  const resetBtn = input.closest('tr').querySelector('td:last-child');
+  if (resetBtn) {
+    resetBtn.innerHTML = customLabels[customKey]
+      ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultLabel}')" title="Reset">&times;</button>`
+      : '';
+  }
   updateSummary();
 }
 
@@ -944,12 +1130,12 @@ function updateSummary() {
   const alerts = document.getElementById('includeAlerts').checked ? 'Yes' : 'No';
   const dry = document.getElementById('dryRun').checked ? 'Yes' : 'No';
 
-  const labelLines = [...selectedTenants].map(t => {
-    const d = TENANT_DATA[t];
-    const customKey = `${t}-${dest}`;
-    const label = customLabels[customKey] || d.runLabels?.[dest] || d.runLabels?.[src] || '?';
-    const suffix = selectedPhase === 'shadow' ? '.test' : '';
-    return `  ${d.label.padEnd(16)} ${label}${suffix}`;
+  const selRunners = getSelectedRunners();
+  const suffix = selectedPhase === 'shadow' ? '.test' : '';
+  const labelLines = selRunners.map(r => {
+    const customKey = `${r.tenant}-${r.key}-${dest}`;
+    const label = customLabels[customKey] || r.label;
+    return `  ${r.tenantLabel.padEnd(16)} ${label}${suffix}  (${r.namespace})`;
   }).join('\n');
 
   s.textContent =
@@ -962,7 +1148,7 @@ Max Runners:  ${maxR}
 RBAC:         ${rbac}
 Alerts:       ${alerts}
 Dry-run:      ${dry}
-${selectedTenants.size > 0 ? '\nRunner Labels:\n' + labelLines : ''}`;
+${selRunners.length > 0 ? '\nRunner Labels (' + selRunners.length + ' selected):\n' + labelLines : ''}`;
 
   const preview = document.getElementById('batchPreview');
   if (selectedTenants.size > 1) {
@@ -991,7 +1177,6 @@ async function triggerBatchMigration(forceDry = false) {
 
   const src = document.getElementById('sourceCluster').value;
   const dest = document.getElementById('destCluster').value;
-  if (src === dest) { showStatus('error', 'Source and destination cannot be the same cluster'); return; }
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -1043,12 +1228,21 @@ async function triggerSingle(tenant, forceDry = false, silent = false) {
   const dest = document.getElementById('destCluster').value;
   const data = TENANT_DATA[tenant];
 
+  const allRunners = data.allRunners?.[src]?.runners || [];
+  const selKeys = allRunners
+    .filter(r => selectedRunners[`${tenant}-${r.key}`] !== false)
+    .map(r => {
+      const customKey = `${tenant}-${r.key}-${dest}`;
+      return customLabels[customKey] || r.label;
+    });
+
   const inputs = {
     tenant: tenant,
     phase: selectedPhase,
     source_cluster: src,
     destination_cluster: dest,
     namespaces: data.ns || 'all',
+    runner_labels: selKeys.join(','),
     max_runners: document.getElementById('maxRunners').value || '',
     include_rbac: document.getElementById('includeRbac').checked ? 'true' : 'false',
     dry_run: (forceDry || document.getElementById('dryRun').checked) ? 'true' : 'false',
@@ -1093,15 +1287,15 @@ function exportPlan() {
   md += `**Phase:** ${selectedPhase}\n`;
   md += `**Source:** \`${src}\`\n`;
   md += `**Destination:** \`${dest}\`\n\n`;
-  md += `## Tenants\n\n`;
-  md += `| Tenant | Runner Label | Namespaces | AD Group | Status |\n`;
+  md += `## Runner Labels\n\n`;
+  md += `| Tenant | Runner Key | Label | Namespace | Status |\n`;
   md += `|---|---|---|---|---|\n`;
-  tenants.forEach(t => {
-    const d = TENANT_DATA[t];
-    const customKey = `${t}-${dest}`;
-    const label = customLabels[customKey] || d.runLabels?.[dest] || d.runLabels?.[src] || '?';
-    const suffix = selectedPhase === 'shadow' ? '.test' : '';
-    md += `| ${d.label} | \`${label}${suffix}\` | \`${d.ns}\` | \`${d.group || 'none'}\` | Pending |\n`;
+  const selRunners = getSelectedRunners();
+  const suffix = selectedPhase === 'shadow' ? '.test' : '';
+  selRunners.forEach(r => {
+    const customKey = `${r.tenant}-${r.key}-${dest}`;
+    const label = customLabels[customKey] || r.label;
+    md += `| ${r.tenantLabel} | \`${r.key}\` | \`${label}${suffix}\` | \`${r.namespace}\` | Pending |\n`;
   });
   md += `\n## Checklist\n\n`;
   md += `- [ ] Shadow runners deployed\n`;

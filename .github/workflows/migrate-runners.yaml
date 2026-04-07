@@ -4,21 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tenant:
-        description: "Tenant to migrate"
+        description: "Tenant to migrate (e.g., sglang, pytorch, hf, rocm, meta-pytorch, etc.)"
         required: true
-        type: choice
-        options:
-          - sglang
-          - vllm
-          - pytorch
-          - hf
-          - jax
-          - rad
-          - iree
-          - aims
-          - aiter
-          - triton
-          - custom
+        type: string
       phase:
         description: "Migration phase"
         required: true
@@ -30,47 +18,38 @@ on:
           - promote
           - verify
       source_cluster:
-        description: "Source cluster"
+        description: "Source cluster (e.g., prod-vultr-mi325, do-atl1-vm-public)"
         required: true
-        type: choice
-        options:
-          - prod-vultr-mi325
-          - tw-mia1-mi355-public
-          - do-atl1-vm-public
-          - ccs-aus-bm-pvt-prd
-          - vultr-ord-bm-public2
-          - aks-saiscale-linux
+        type: string
       destination_cluster:
         description: "Destination cluster"
         required: true
-        type: choice
-        options:
-          - prod-vultr-mi325
-          - tw-mia1-mi355-public
-          - do-atl1-vm-public
-          - ccs-aus-bm-pvt-prd
-          - vultr-ord-bm-public2
-          - aks-saiscale-linux
+        type: string
       namespaces:
         description: "Comma-separated namespaces (leave 'all' to auto-detect from tenant)"
         required: false
         type: string
         default: "all"
+      runner_labels:
+        description: "Comma-separated runner labels to migrate (blank = all labels for the tenant)"
+        required: false
+        type: string
+        default: ""
       max_runners:
         description: "Override maxRunners (blank = keep current). Format: runner-key=count,runner-key=count"
         required: false
         type: string
         default: ""
       include_rbac:
-        description: "Create RBAC manifests (RoleBinding + ClusterRoleBinding)"
+        description: "Create RBAC manifests (true/false)"
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: "true"
       dry_run:
-        description: "Dry-run mode (preview only, no file changes)"
+        description: "Dry-run mode - preview only, no file changes (true/false)"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: "false"
 
 concurrency:
   group: migrate-runners-${{ github.event.inputs.source_cluster }}-${{ github.event.inputs.destination_cluster }}

@@ -158,7 +158,9 @@
             { "key": "pytorch-mi325-1gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.1" },
             { "key": "pytorch-mi350-2gpu-runner", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.2" },
             { "key": "pytorch-mi325-4gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.4" },
-            { "key": "pytorch-mi325-8gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.8" }
+            { "key": "pytorch-mi325-8gpu-runner-no-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.gfx950.8" },
+            { "key": "pytorch-ecosystem-1gpu-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.ecosystem.gfx950.1" },
+            { "key": "pytorch-ecosystem-8gpu-test", "namespace": "arc-pytorch", "label": "linux.rocm.gpu.ecosystem.gfx950.8" }
           ]
         }
       }
