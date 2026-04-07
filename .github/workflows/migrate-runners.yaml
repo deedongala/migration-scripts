@@ -64,13 +64,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Generate app token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.AUTOMATION_APP_ID }}
-          private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
-
       - name: Resolve tenant to namespaces
         id: resolve
         run: |
@@ -196,7 +189,7 @@ jobs:
         with:
           ref: ${{ steps.branches.outputs.base }}
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Configure git
         run: |
@@ -480,7 +473,7 @@ jobs:
       - name: Create Pull Request
         if: github.event.inputs.phase != 'verify' && github.event.inputs.dry_run != 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           PHASE="${{ github.event.inputs.phase }}"
           TENANT="${{ steps.resolve.outputs.tenant }}"
