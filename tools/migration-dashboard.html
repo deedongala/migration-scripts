@@ -1060,7 +1060,7 @@ function renderMigrationLabels() {
             oninput="onLabelEdit(this, '${customKey}', '${defaultDestLabel}')"
             placeholder="${defaultDestLabel}"
             ${isSelected ? '' : 'disabled'}>
-          ${isShadow && isSelected ? `<div class="label-shadow">Deployed as: <strong>${shadowLabel}</strong></div>` : ''}
+          ${isSelected ? `<div class="label-shadow">Will deploy as: <strong>${shadowLabel}</strong></div>` : ''}
         </td>
         <td style="width:30px;">
           ${customLabels[customKey] ? `<button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;" onclick="resetLabel('${customKey}','${defaultDestLabel}')" title="Reset">&times;</button>` : ''}
