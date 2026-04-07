@@ -140,14 +140,6 @@ jobs:
           if [[ "$SRC" == "$DEST" && "${{ github.event.inputs.phase }}" == "shadow" ]]; then
             echo "::warning::Source and destination are the same cluster (allowed for promote/drain/delete)"
           fi
-          if [[ ! -d "clusters/$SRC" ]]; then
-            echo "::error::Source cluster directory not found: clusters/$SRC"
-            exit 1
-          fi
-          if [[ ! -d "clusters/$DEST" ]]; then
-            echo "::error::Destination cluster directory not found: clusters/$DEST"
-            exit 1
-          fi
 
       - name: Determine branch names
         id: branches
@@ -190,6 +182,19 @@ jobs:
           ref: ${{ steps.branches.outputs.base }}
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+
+      - name: Validate cluster directories
+        run: |
+          SRC="${{ github.event.inputs.source_cluster }}"
+          DEST="${{ github.event.inputs.destination_cluster }}"
+          if [[ ! -d "clusters/$SRC" ]]; then
+            echo "::error::Source cluster directory not found: clusters/$SRC"
+            exit 1
+          fi
+          if [[ ! -d "clusters/$DEST" ]]; then
+            echo "::error::Destination cluster directory not found: clusters/$DEST"
+            exit 1
+          fi
 
       - name: Configure git
         run: |
