@@ -884,6 +884,7 @@ function selectPhase(phase) {
   selectedPhase = phase;
   document.querySelectorAll('.phase-pill').forEach(p => p.classList.remove('active'));
   event.target.classList.add('active');
+  renderMigrationLabels();
   updateSummary();
 }
 
