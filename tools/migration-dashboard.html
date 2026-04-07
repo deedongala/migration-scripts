@@ -1257,7 +1257,7 @@ async function triggerSingle(tenant, forceDry = false, silent = false) {
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ref: 'staging', inputs }),
+      body: JSON.stringify({ ref: 'main', inputs }),
     });
 
     if (resp.status === 204) {
